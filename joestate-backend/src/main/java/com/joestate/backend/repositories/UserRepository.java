@@ -4,11 +4,12 @@ import com.joestate.backend.entities.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;
+import java.util.List;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    // For Login (F1)
+    // For Login
     Optional<User> findByEmail(String email);
     Optional<User> findByUsername(String username);
 
@@ -18,4 +19,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Uniqueness Checks for Registration
     Boolean existsByEmail(String email);
     Boolean existsByUsername(String username);
+
+    List<User> findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(String firstName, String lastName);
 }

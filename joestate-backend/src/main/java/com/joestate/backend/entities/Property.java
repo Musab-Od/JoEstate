@@ -41,6 +41,9 @@ public class Property {
     private LocalDateTime datePosted;
 
     @OneToMany(mappedBy = "property", cascade = CascadeType.ALL)
+    private List<Favorite> favoritedBy;
+
+    @OneToMany(mappedBy = "property", cascade = CascadeType.ALL)
     private List<PropertyImage> images;
 
     public enum PropertyType { APARTMENT, VILLA, HOUSE, CHALET, STUDIO, SHOP, OFFICE, WAREHOUSE, FARM, LAND }

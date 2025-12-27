@@ -3,6 +3,7 @@ package com.joestate.backend.entities;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -13,6 +14,11 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long userId;
+
+    private String firstName; // Added
+    private String lastName;
+    private String profilePictureUrl;
+    private String bio;
 
     @Column(nullable = false, unique = true)
     private String username;
@@ -32,6 +38,9 @@ public class User {
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<Favorite> favorites;
 
     @PrePersist
     protected void onCreate() {
