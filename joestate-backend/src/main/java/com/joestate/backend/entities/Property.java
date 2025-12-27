@@ -34,6 +34,9 @@ public class Property {
     @Enumerated(EnumType.STRING)
     private Status status = Status.ACTIVE;
 
+    @Enumerated(EnumType.STRING)
+    private RentFrequency rentFrequency;
+
     @Column(name = "date_posted", insertable = false, updatable = false)
     private LocalDateTime datePosted;
 
@@ -43,4 +46,5 @@ public class Property {
     public enum PropertyType { APARTMENT, VILLA, HOUSE, CHALET, STUDIO, SHOP, OFFICE, WAREHOUSE, FARM, LAND }
     public enum Purpose { RENT, BUY }
     public enum Status { ACTIVE, SOLD, RENTED }
+    public enum RentFrequency { DAILY, WEEKLY, MONTHLY, YEARLY, NONE }
 }

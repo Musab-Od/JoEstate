@@ -1,0 +1,37 @@
+package com.joestate.backend.repositories;
+
+import com.joestate.backend.entities.Property;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import java.util.List;
+
+@Repository
+public interface PropertyRepository extends JpaRepository<Property, Long> {
+
+    // Advanced Dynamic Search (F2)
+    @Query("SELECT p FROM Property p WHERE " +
+            "(:loc IS NULL OR p.location LIKE %:loc%) AND " +
+            "(:purp IS NULL OR p.purpose = :purp) AND " +
+            "(:type IS NULL OR p.type = :type) AND " +
+            "(:freq IS NULL OR p.rentFrequency = :freq) AND " +
+            "(:minP IS NULL OR p.price >= :minP) AND " +
+            "(:maxP IS NULL OR p.price <= :maxP) AND " +
+            "(:beds IS NULL OR p.roomCount >= :beds) AND " +
+            "(:baths IS NULL OR p.bathCount >= :baths) AND " +
+            "(p.status = 'ACTIVE')") // Only show active listings
+    List<Property> searchProperties(
+            @Param("loc") String location,
+            @Param("purp") Property.Purpose purpose,
+            @Param("type") Property.PropertyType type,
+            @Param("freq") Property.RentFrequency frequency,
+            @Param("minP") Double minPrice,
+            @Param("maxP") Double maxPrice,
+            @Param("beds") Integer beds,
+            @Param("baths") Integer baths
+    );
+
+    // To show "My Listings" in the Profile (F3)
+    List<Property> findByOwnerUserId(Long userId);
+}

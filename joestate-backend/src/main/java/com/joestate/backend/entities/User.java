@@ -38,6 +38,8 @@ public class User {
         this.createdAt = LocalDateTime.now();
     }
 
+    private String verificationCode;
+
     public enum Role {
         USER,
         ADMIN,
