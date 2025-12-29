@@ -10,7 +10,6 @@ import java.util.List;
 @Repository
 public interface PropertyRepository extends JpaRepository<Property, Long> {
 
-    // Advanced Dynamic Search (F2)
     @Query("SELECT p FROM Property p WHERE " +
             "(:loc IS NULL OR p.location LIKE %:loc%) AND " +
             "(:purp IS NULL OR p.purpose = :purp) AND " +
@@ -18,9 +17,11 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
             "(:freq IS NULL OR p.rentFrequency = :freq) AND " +
             "(:minP IS NULL OR p.price >= :minP) AND " +
             "(:maxP IS NULL OR p.price <= :maxP) AND " +
+            "(:minA IS NULL OR p.area >= :minA) AND " +
+            "(:maxA IS NULL OR p.area <= :maxA) AND " +
             "(:beds IS NULL OR p.roomCount >= :beds) AND " +
             "(:baths IS NULL OR p.bathCount >= :baths) AND " +
-            "(p.status = 'ACTIVE')") // Only show active listings
+            "(p.status = 'ACTIVE')")
     List<Property> searchProperties(
             @Param("loc") String location,
             @Param("purp") Property.Purpose purpose,
@@ -28,10 +29,11 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
             @Param("freq") Property.RentFrequency frequency,
             @Param("minP") Double minPrice,
             @Param("maxP") Double maxPrice,
+            @Param("minA") Integer minArea,
+            @Param("maxA") Integer maxArea,
             @Param("beds") Integer beds,
             @Param("baths") Integer baths
     );
 
-    // To show "My Listings" in the Profile (F3)
     List<Property> findByOwnerUserId(Long userId);
 }
