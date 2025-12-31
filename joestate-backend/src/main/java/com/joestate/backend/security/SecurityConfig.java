@@ -49,9 +49,12 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable()) // Disable CSRF for simpler API testing
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                                 .requestMatchers("/api/auth/**").permitAll() // Open door for Login/Register
+                                .requestMatchers("/api/properties/**").permitAll() //Open door for property listing
                                 .anyRequest().permitAll() // For now, it's open to finish MVP faster.
                         // Later change .authenticated()
                 );
@@ -65,8 +68,9 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Allow the React Frontend (usually running on port 3000 or 5173 for Vite)
-        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:5173"));
+        // ⚠️ CHANGED: Use setAllowedOriginPatterns("*") instead of specific list
+        // This allows localhost, 127.0.0.1, and any other local IP.
+        configuration.setAllowedOriginPatterns(List.of("*"));
 
         // Allow standard HTTP methods
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
