@@ -9,6 +9,10 @@ import com.joestate.backend.repositories.UserRepository;
 import com.joestate.backend.repositories.PropertyImageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
+import java.nio.file.*;
+import java.util.UUID;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -20,6 +24,9 @@ public class PropertyService {
     private final PropertyRepository propertyRepository;
     private final UserRepository userRepository;
     private final PropertyImageRepository propertyImageRepository;
+
+    // Directory to save uploaded images
+    private final String UPLOAD_DIR = "uploads/";
 
     // Dynamic Search
     public List<PropertyDTO> searchProperties(
@@ -72,23 +79,39 @@ public class PropertyService {
 
         Property savedProperty = propertyRepository.save(property);
 
-        if (dto.getImageUrls() != null && !dto.getImageUrls().isEmpty()) {
-            for (int i = 0; i < dto.getImageUrls().size(); i++) {
-                String url = dto.getImageUrls().get(i);
-
-                PropertyImage image = new PropertyImage();
-                image.setProperty(savedProperty);
-                image.setImageUrl(url);
-
-                // LOGIC: The first image (index 0) is the Thumbnail (Main)
-                if (i == 0) {
-                    image.setMain(true);
-                } else {
-                    image.setMain(false);
-                }
-
-                propertyImageRepository.save(image);
+        // Handle Image Uploads
+        try {
+            // 1. Create the 'uploads' folder if it doesn't exist
+            Path uploadPath = Paths.get(UPLOAD_DIR);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
             }
+
+            // 2. Check the NEW field: getImageFiles()
+            if (dto.getImageFiles() != null && !dto.getImageFiles().isEmpty()) {
+                boolean isFirstImage = true;
+
+                for (MultipartFile file : dto.getImageFiles()) {
+                    if (file.isEmpty()) continue;
+
+                    // 3. Generate Unique Name & Save to Disk
+                    String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+                    Path filePath = uploadPath.resolve(fileName);
+                    Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+                    // 4. Save Reference to DB
+                    PropertyImage image = new PropertyImage();
+                    image.setProperty(savedProperty);
+                    image.setImageUrl(fileName); // Save just the filename
+                    image.setMain(isFirstImage);
+
+                    propertyImageRepository.save(image);
+
+                    isFirstImage = false; // Only first image is main
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to upload images", e);
         }
     }
 
@@ -98,6 +121,7 @@ public class PropertyService {
                 .ownerId(p.getOwner().getUserId())
                 // Handle potential null pointer if owner is deleted, though database constraints usually prevent this
                 .ownerName(p.getOwner().getFirstName() + " " + p.getOwner().getLastName())
+                .ownerPhone(p.getOwner().getPhoneNumber())
                 .title(p.getTitle())
                 .description(p.getDescription())
                 .price(p.getPrice())

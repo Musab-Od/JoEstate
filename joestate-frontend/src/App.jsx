@@ -6,6 +6,7 @@ import AuthPage from "./pages/AuthPage";
 import AboutPage from "./pages/AboutPage";
 import ContactPage from "./pages/ContactPage";
 import FaqPage from "./pages/FaqPage";
+import AddPropertyPage from "./pages/AddPropertyPage.jsx";
 
 const HomePage = () => (
     <div className="flex flex-col min-h-screen">
@@ -31,12 +32,7 @@ function App() {
                         <Route path="/login" element={<AuthPage />} />
                         <Route path="/register" element={<AuthPage />} />
 
-                        {/* Protected Pages (Placeholders for now) */}
-                        <Route path="/add-property" element={
-                            <div className="mt-20 text-center font-bold text-2xl text-gray-400">
-                                Step 2: Add Property Form Coming Soon...
-                            </div>
-                        } />
+                        <Route path="/add-property" element={<AddPropertyPage />} />
 
                         <Route path="/profile" element={
                             <div className="mt-20 text-center font-bold text-2xl text-gray-400">

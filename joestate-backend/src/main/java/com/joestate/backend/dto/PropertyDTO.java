@@ -9,6 +9,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.springframework.web.multipart.MultipartFile;
 
 @Data
 @Builder
@@ -19,6 +21,7 @@ public class PropertyDTO {
 
     private Long ownerId;
     private String ownerName;
+    private String ownerPhone;
 
     private String title;
     private String description;
@@ -33,6 +36,9 @@ public class PropertyDTO {
     private RentFrequency rentFrequency;
 
     private List<String> imageUrls;
+
+    @JsonIgnore
+    private List<MultipartFile> imageFiles;
 
     private LocalDateTime datePosted;
 }

@@ -19,3 +19,6 @@ buildNumber.properties
 docs/*.pdf
 
 .idea/
+
+uploads/
+**/uploads/

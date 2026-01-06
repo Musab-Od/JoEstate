@@ -18,6 +18,7 @@ public class Property {
     private User owner;
 
     private String title;
+    @Column(columnDefinition = "TEXT")
     private String description;
     private Double price;
     private Double area;
@@ -37,8 +38,13 @@ public class Property {
     @Enumerated(EnumType.STRING)
     private RentFrequency rentFrequency;
 
-    @Column(name = "date_posted", insertable = false, updatable = false)
+    @Column(name = "date_posted")
     private LocalDateTime datePosted;
+
+    @PrePersist
+    protected void onCreate() {
+        datePosted = LocalDateTime.now();
+    }
 
     @OneToMany(mappedBy = "property", cascade = CascadeType.ALL)
     private List<Favorite> favoritedBy;

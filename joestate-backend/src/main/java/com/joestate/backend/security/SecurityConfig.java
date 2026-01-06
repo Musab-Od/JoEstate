@@ -4,6 +4,7 @@ import com.joestate.backend.services.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -48,19 +49,29 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // Disable CSRF for simpler API testing
+                .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
-                                .requestMatchers("/api/auth/**").permitAll() // Open door for Login/Register
-                                .requestMatchers("/api/properties/**").permitAll() //Open door for property listing
-                                .anyRequest().permitAll() // For now, it's open to finish MVP faster.
-                        // Later change .authenticated()
+                        // 1. Allow OPTIONS (Pre-flight) for everyone
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // 2. Auth endpoints (Login/Register) are open
+                        .requestMatchers("/api/auth/**").permitAll()
+
+                        // 3. Property endpoints
+                        // Everyone can SEARCH/VIEW (GET)
+                        .requestMatchers(HttpMethod.GET, "/api/properties/**").permitAll()
+                        // Only Logged-in users can CREATE/EDIT (POST, PUT, DELETE)
+                        .requestMatchers(HttpMethod.POST, "/api/properties/**").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/properties/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/properties/**").authenticated()
+
+                        // 4. Everything else requires login
+                        .anyRequest().authenticated()
                 );
 
         http.addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
 
@@ -68,15 +79,14 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // ⚠️ CHANGED: Use setAllowedOriginPatterns("*") instead of specific list
-        // This allows localhost, 127.0.0.1, and any other local IP.
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        // Allow requests from the frontend application
+        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
 
         // Allow standard HTTP methods
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 
-        // Allow headers (needed for the JWT Token)
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // Allow specific headers
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Cache-Control", "X-Requested-With"));
 
         // Allow sending credentials (cookies/tokens)
         configuration.setAllowCredentials(true);
