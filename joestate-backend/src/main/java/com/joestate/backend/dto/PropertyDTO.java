@@ -30,10 +30,11 @@ public class PropertyDTO {
     private String location;
     private Integer roomCount;
     private Integer bathCount;
-
+    private Boolean isFavorite;
     private PropertyType type;
     private Purpose purpose;
     private RentFrequency rentFrequency;
+    private String ownerProfilePictureUrl;
 
     private List<String> imageUrls;
 

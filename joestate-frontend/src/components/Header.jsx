@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { User, LogOut, Menu, PlusCircle, Globe, Building2, ChevronDown, LayoutDashboard } from "lucide-react";
+import axios from "../api/axios";
+import { User, LogOut, Menu, PlusCircle, Globe, Building2, ChevronDown, LayoutDashboard, Heart } from "lucide-react";
 
 const Header = () => {
     const navigate = useNavigate();
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userName, setUserName] = useState("");
+    const [avatarUrl, setAvatarUrl] = useState(null);
     const [language, setLanguage] = useState("EN");
 
     // Menus State
@@ -14,19 +16,37 @@ const Header = () => {
 
     const dropdownRef = useRef(null);
 
-    // Load User Data
+    // Load User Data & Fetch Avatar
     useEffect(() => {
         const token = localStorage.getItem("token");
-        const user = localStorage.getItem("user");
+        const storedUser = localStorage.getItem("user");
         const savedLang = localStorage.getItem("lang");
+
+        if (savedLang) setLanguage(savedLang);
 
         if (token) {
             setIsLoggedIn(true);
-            setUserName(user || "User");
-        }
-        if (savedLang) setLanguage(savedLang);
+            setUserName(storedUser || "User");
 
-        // Click outside listener for dropdown
+            // FETCH REAL USER DATA (Avatar)
+            axios.get("/users/me", {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+                .then(res => {
+                    // Update name just in case it changed
+                    setUserName(res.data.firstName);
+
+                    // Set Avatar if it exists
+                    if (res.data.profilePictureUrl) {
+                        setAvatarUrl(`http://localhost:8080/uploads/${res.data.profilePictureUrl}`);
+                    }
+                })
+                .catch(err => {
+                    console.error("Failed to fetch user info for header", err);
+                });
+        }
+
+        // Click outside listener
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setIsUserDropdownOpen(false);
@@ -40,7 +60,9 @@ const Header = () => {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         setIsLoggedIn(false);
+        setAvatarUrl(null);
         navigate("/");
+        window.location.reload(); // Ensure clean state
     };
 
     const toggleLanguage = () => {
@@ -49,13 +71,11 @@ const Header = () => {
         localStorage.setItem("lang", newLang);
     };
 
-    // "Add Property" Logic
     const handleAddPropertyClick = (e) => {
         e.preventDefault();
         if (isLoggedIn) {
             navigate("/add-property");
         } else {
-            // If guest, go to register (standard conversion tactic)
             navigate("/register");
         }
     };
@@ -70,12 +90,12 @@ const Header = () => {
                         <Building2 className="text-white w-6 h-6" />
                     </div>
                     <div className="flex flex-col leading-none">
-            <span className="text-2xl font-extrabold text-blue-900 tracking-tight">
-              JO<span className="text-blue-600 font-light">ESTATE</span>
-            </span>
+                        <span className="text-2xl font-extrabold text-blue-900 tracking-tight">
+                          JO<span className="text-blue-600 font-light">ESTATE</span>
+                        </span>
                         <span className="text-[10px] text-gray-400 font-semibold tracking-widest uppercase pl-0.5">
-              Premium Listings
-            </span>
+                          Premium Listings
+                        </span>
                     </div>
                 </Link>
 
@@ -95,7 +115,7 @@ const Header = () => {
                         <span>{language}</span>
                     </button>
 
-                    {/* GLOBAL ADD PROPERTY BUTTON (Visible to everyone) */}
+                    {/* Add Property Button */}
                     <button
                         onClick={handleAddPropertyClick}
                         className="hidden md:flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-5 py-2.5 rounded-full hover:shadow-lg hover:shadow-blue-200 transition text-sm font-bold transform hover:-translate-y-0.5"
@@ -107,7 +127,7 @@ const Header = () => {
                     {/* USER LOGIC */}
                     {isLoggedIn ? (
                         <div className="relative" ref={dropdownRef}>
-                            {/* User Dropdown Trigger */}
+                            {/* User Trigger */}
                             <button
                                 onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
                                 className="flex items-center gap-3 pl-4 border-l border-gray-200 ml-2 hover:opacity-80 transition"
@@ -116,20 +136,34 @@ const Header = () => {
                                     <p className="text-[10px] uppercase text-gray-400 font-bold tracking-wider">Hello</p>
                                     <p className="text-sm font-bold text-gray-800 leading-none">{userName}</p>
                                 </div>
-                                <div className="bg-gray-100 p-2 rounded-full text-gray-600">
-                                    <User className="w-5 h-5" />
+
+                                {/* AVATAR OR ICON Logic */}
+                                <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
+                                    {avatarUrl ? (
+                                        <img src={avatarUrl} alt="User" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <User className="w-5 h-5 text-gray-500" />
+                                    )}
                                 </div>
+
                                 <ChevronDown className={`w-4 h-4 text-gray-400 transition transform ${isUserDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
 
-                            {/* The Dropdown Menu */}
+                            {/* Dropdown Menu */}
                             {isUserDropdownOpen && (
-                                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 animate-in fade-in slide-in-from-top-2">
-                                    <Link to="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600">
+                                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 animate-in fade-in slide-in-from-top-2">
+                                    <Link to="/profile" className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-medium">
                                         <LayoutDashboard className="w-4 h-4" /> My Profile
                                     </Link>
+
+                                    {/*/!*  Favorites Link *!/*/}
+                                    {/*<Link to="/favorites" className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-medium">*/}
+                                    {/*    <Heart className="w-4 h-4" /> My Favorites*/}
+                                    {/*</Link>*/}
+
                                     <div className="border-t border-gray-100 my-1"></div>
-                                    <button onClick={handleLogout} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+
+                                    <button onClick={handleLogout} className="w-full text-left flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 font-medium">
                                         <LogOut className="w-4 h-4" /> Logout
                                     </button>
                                 </div>

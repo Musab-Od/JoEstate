@@ -62,11 +62,12 @@ public class SecurityConfig {
                         // 3. Property endpoints
                         // Everyone can SEARCH/VIEW (GET)
                         .requestMatchers(HttpMethod.GET, "/api/properties/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/users/{id}").permitAll()
                         // Only Logged-in users can CREATE/EDIT (POST, PUT, DELETE)
                         .requestMatchers(HttpMethod.POST, "/api/properties/**").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/properties/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/properties/**").authenticated()
-
+                        .requestMatchers("/uploads/**").permitAll()
                         // 4. Everything else requires login
                         .anyRequest().authenticated()
                 );

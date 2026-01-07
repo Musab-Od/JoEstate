@@ -7,7 +7,6 @@ import com.joestate.backend.services.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.*;
 
 @RestController // 1. Tells Spring: "This class handles HTTP requests"
 @RequestMapping("/api/auth") // 2. All endpoints here start with /api/auth

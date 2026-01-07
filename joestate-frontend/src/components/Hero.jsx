@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { Search, MapPin, ChevronDown, Check, RotateCcw } from "lucide-react";
 import heroImage from "../assets/daniel-qura-unsplash-heroSection.jpg";
+import axios from "../api/axios";
 
-const Hero = () => {
+const Hero = ({onSearch}) => {
     // --- 1. STATES ---
     const [activePopup, setActivePopup] = useState(null);
 
@@ -15,6 +16,10 @@ const Hero = () => {
     const [area, setArea] = useState({ min: "", max: "" });
     const [price, setPrice] = useState({ min: "", max: "" });
 
+    // --- AUTOCOMPLETE STATES ---
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
     const popupRef = useRef(null);
 
     const propertyTypes = [
@@ -24,11 +29,12 @@ const Hero = () => {
 
     const rentFrequencies = ["Any", "Yearly", "Monthly", "Weekly", "Daily"];
 
-    // Close popup logic
+    // Close popup logic (Modified to also close suggestions)
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (popupRef.current && !popupRef.current.contains(event.target)) {
                 setActivePopup(null);
+                setShowSuggestions(false); // Close suggestions if clicked outside
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
@@ -36,6 +42,67 @@ const Hero = () => {
     }, []);
 
     const togglePopup = (name) => setActivePopup(activePopup === name ? null : name);
+
+    // --- SMART SEARCH LOGIC ---
+    const handleLocationChange = async (e) => {
+        const value = e.target.value;
+        setLocation(value);
+
+        if (value.length > 1) {
+            try {
+                // Call the backend endpoint we just created
+                const response = await axios.get(`/properties/locations?query=${value}`);
+                setSuggestions(response.data);
+                setShowSuggestions(true);
+            } catch (error) {
+                console.error("Error fetching locations", error);
+            }
+        } else {
+            setSuggestions([]);
+            setShowSuggestions(false);
+        }
+    };
+
+    const selectSuggestion = (suggestion) => {
+        setLocation(suggestion);
+        setShowSuggestions(false);
+    };
+
+    const handleSearchClick = () => {
+        // 1. Prepare the Filter Object
+        const filters = {
+            location: location,
+            purpose: purpose === 'Rent' ? 'RENT' : 'BUY',
+            type: propertyType.toUpperCase(), // e.g., "APARTMENT"
+        };
+
+        // 2. Handle Rent Frequency (Only if Renting & Not "Any")
+        if (purpose === 'Rent' && rentFreq !== 'Any') {
+            filters.rentFrequency = rentFreq.toUpperCase();
+        }
+
+        // 3. Handle Price (Min/Max) - Only add if user typed something
+        if (price.min) filters.minPrice = price.min;
+        if (price.max) filters.maxPrice = price.max;
+
+        // 4. Handle Area (Min/Max)
+        if (area.min) filters.minArea = area.min;
+        if (area.max) filters.maxArea = area.max;
+
+        // 5. Handle Beds & Baths
+        // Logic: If user selected "+10", we send "10". Backend treats it as ">= 10"
+        if (beds) {
+            filters.beds = beds === "+10" ? 10 : beds;
+        }
+        if (baths) {
+            filters.baths = baths === "+6" ? 6 : baths;
+        }
+
+        // 6. Send to Parent (HomePage)
+        if (onSearch) {
+            onSearch(filters);
+        }
+    };
 
     return (
         <div className="relative h-[600px] flex items-center justify-center">
@@ -50,29 +117,21 @@ const Hero = () => {
                 }}
             >
                 <div className="absolute inset-0 bg-black/50"></div>
-                <div className="absolute bottom-4 right-6 text-white/50 text-xs font-light">
-                    Photo by Danial Qura
-                </div>
             </div>
 
             {/* 2. CENTERED CONTENT */}
-            <div className="relative z-10 w-full max-w-5xl px-4">
+            <div className="relative z-20 w-full max-w-5xl px-4">
 
                 <div className="text-center mb-8 text-white">
                     <h1 className="text-4xl md:text-6xl font-extrabold mb-4 tracking-tight shadow-black drop-shadow-lg">
                         Find Your Dream Home in <span className="text-blue-400">Jordan</span>
                     </h1>
-                    <p className="text-lg md:text-xl text-gray-200 font-light drop-shadow-md">
-                        Search thousands of apartments, villas, and offices in Amman & beyond.
-                    </p>
                 </div>
 
                 {/* 3. THE SEARCH CONTAINER */}
                 <div className="bg-white rounded-2xl shadow-2xl p-4 md:p-6 relative" ref={popupRef}>
 
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-
-                        {/* --- ROW 1: Purpose & Location --- */}
 
                         {/* PURPOSE (Rent/Buy) */}
                         <div className="md:col-span-3 relative">
@@ -83,19 +142,19 @@ const Hero = () => {
                                 <div className="text-left">
                                     <span className="block text-[10px] text-gray-500 font-bold uppercase tracking-wider">Purpose</span>
                                     <span className="block font-bold text-gray-800 text-sm truncate">
-                    {purpose} {purpose === "Rent" && rentFreq !== "Any" && `(${rentFreq})`}
-                  </span>
+                                        {purpose} {purpose === "Rent" && rentFreq !== "Any" && `(${rentFreq})`}
+                                    </span>
                                 </div>
                                 <ChevronDown className="w-4 h-4 text-gray-400" />
                             </button>
 
+                            {/* ... Purpose Dropdown Code ... */}
                             {activePopup === 'purpose' && (
                                 <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 p-4 z-50 animate-in fade-in slide-in-from-top-2">
                                     <div className="flex gap-2 mb-4">
                                         <button onClick={() => setPurpose("Rent")} className={`flex-1 py-2 rounded-lg text-sm font-bold border ${purpose === "Rent" ? "bg-blue-600 text-white border-blue-600" : "text-gray-600 border-gray-200"}`}>Rent</button>
                                         <button onClick={() => setPurpose("Buy")} className={`flex-1 py-2 rounded-lg text-sm font-bold border ${purpose === "Buy" ? "bg-blue-600 text-white border-blue-600" : "text-gray-600 border-gray-200"}`}>Buy</button>
                                     </div>
-
                                     {purpose === "Rent" && (
                                         <div className="mb-4">
                                             <p className="text-xs font-bold text-gray-400 mb-2 uppercase">Frequency</p>
@@ -117,7 +176,7 @@ const Hero = () => {
                             )}
                         </div>
 
-                        {/* LOCATION */}
+                        {/* --- SMART LOCATION INPUT --- */}
                         <div className="md:col-span-9 relative">
                             <div className="w-full h-14 border border-gray-200 bg-gray-50 rounded-xl px-4 flex items-center hover:border-blue-500 transition focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600">
                                 <MapPin className="w-5 h-5 text-blue-600 mr-3" />
@@ -126,16 +185,31 @@ const Hero = () => {
                                     <input
                                         type="text"
                                         placeholder="City, Neighborhood..."
+                                        autoComplete="off"
                                         value={location}
-                                        onChange={(e) => setLocation(e.target.value)}
+                                        onChange={handleLocationChange} // <--- UPDATED
+                                        onFocus={() => { if(suggestions.length > 0) setShowSuggestions(true); }}
                                         className="w-full bg-transparent focus:outline-none text-sm font-bold text-gray-800 placeholder-gray-400"
                                     />
                                 </div>
                             </div>
+
+                            {/* --- SUGGESTIONS DROPDOWN --- */}
+                            {showSuggestions && suggestions.length > 0 && (
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                                    {suggestions.map((s, index) => (
+                                        <div
+                                            key={index}
+                                            onClick={() => selectSuggestion(s)}
+                                            className="px-4 py-3 hover:bg-blue-50 cursor-pointer flex items-center gap-2 text-sm text-gray-700 border-b last:border-0"
+                                        >
+                                            <MapPin className="w-4 h-4 text-gray-400" />
+                                            {s}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-
-                        {/* --- ROW 2: Filters --- */}
-
                         {/* TYPE */}
                         <div className="md:col-span-3 relative">
                             <button onClick={() => togglePopup('type')} className={`w-full h-14 border rounded-xl px-3 flex items-center justify-between hover:border-blue-500 transition ${activePopup === 'type' ? 'border-blue-600 ring-1 ring-blue-600' : 'border-gray-200 bg-gray-50'}`}>
@@ -234,11 +308,10 @@ const Hero = () => {
 
                         {/* SEARCH BTN */}
                         <div className="md:col-span-2">
-                            <button className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-200 transition active:scale-95">
+                            <button onClick={handleSearchClick} className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-200 transition active:scale-95">
                                 <Search className="w-5 h-5" /> Search
                             </button>
                         </div>
-
                     </div>
                 </div>
             </div>
