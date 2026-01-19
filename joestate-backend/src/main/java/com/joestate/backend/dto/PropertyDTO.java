@@ -11,6 +11,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
 
 @Data
 @Builder
@@ -25,7 +27,9 @@ public class PropertyDTO {
 
     private String title;
     private String description;
+    @Positive(message = "Price must be positive")
     private Double price;
+    @Min(value = 1, message = "Area must be at least 1 square meter")
     private Double area;
     private String location;
     private Integer roomCount;

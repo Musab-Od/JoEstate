@@ -58,7 +58,7 @@ const AddPropertyPage = () => {
 
         if (name === "price" || name === "area") {
             const rawValue = value.replace(/,/g, "");
-            if (!isNaN(rawValue)) {
+            if (!isNaN(rawValue) && Number(rawValue) >= 0) {
                 setFormData({ ...formData, [name]: rawValue });
             }
         } else {

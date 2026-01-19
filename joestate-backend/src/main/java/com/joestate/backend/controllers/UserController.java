@@ -4,6 +4,7 @@ import com.joestate.backend.dto.PropertyDTO;
 import com.joestate.backend.dto.UserDTO;
 import com.joestate.backend.services.PropertyService;
 import com.joestate.backend.services.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +30,7 @@ public class UserController {
 
     // 2. Update Profile
     @PutMapping("/me")
-    public ResponseEntity<UserDTO> updateProfile(Authentication authentication, @RequestBody UserDTO dto) {
+    public ResponseEntity<UserDTO> updateProfile(Authentication authentication,@Valid @RequestBody UserDTO dto) {
         return ResponseEntity.ok(userService.updateProfile(authentication.getName(), dto));
     }
 

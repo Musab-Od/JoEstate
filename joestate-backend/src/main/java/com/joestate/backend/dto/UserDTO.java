@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.Size;
 
 @Data
 @Builder
@@ -20,6 +21,7 @@ public class UserDTO {
     private String profilePictureUrl;
 
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) // Allows sending to server, but hides from response
+    @Size(min = 6, message = "New password must be at least 6 characters")
     private String password;
 
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)

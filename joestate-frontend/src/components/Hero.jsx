@@ -11,8 +11,8 @@ const Hero = ({onSearch}) => {
     const [rentFreq, setRentFreq] = useState("Any");
     const [location, setLocation] = useState("");
     const [propertyType, setPropertyType] = useState("Apartment");
-    const [beds, setBeds] = useState(2);
-    const [baths, setBaths] = useState(1);
+    const [beds, setBeds] = useState("Any");
+    const [baths, setBaths] = useState("Any");
     const [area, setArea] = useState({ min: "", max: "" });
     const [price, setPrice] = useState({ min: "", max: "" });
 
@@ -24,7 +24,7 @@ const Hero = ({onSearch}) => {
 
     const propertyTypes = [
         "Apartment", "Villa", "House", "Chalet", "Studio",
-        "Shop", "Office", "Werehouse", "Farm", "Land"
+        "Shop", "Office", "Werehouse", "Farm", "Land", "Any"
     ];
 
     const rentFrequencies = ["Any", "Yearly", "Monthly", "Weekly", "Daily"];
@@ -73,8 +73,11 @@ const Hero = ({onSearch}) => {
         const filters = {
             location: location,
             purpose: purpose === 'Rent' ? 'RENT' : 'BUY',
-            type: propertyType.toUpperCase(), // e.g., "APARTMENT"
         };
+
+        if (propertyType !== 'Any') {
+            filters.propertyType = propertyType.toUpperCase();
+        }
 
         // 2. Handle Rent Frequency (Only if Renting & Not "Any")
         if (purpose === 'Rent' && rentFreq !== 'Any') {
@@ -91,10 +94,10 @@ const Hero = ({onSearch}) => {
 
         // 5. Handle Beds & Baths
         // Logic: If user selected "+10", we send "10". Backend treats it as ">= 10"
-        if (beds) {
+        if (beds && beds !== "Any") {
             filters.beds = beds === "+10" ? 10 : beds;
         }
-        if (baths) {
+        if (baths && baths !== "Any") {
             filters.baths = baths === "+6" ? 6 : baths;
         }
 
@@ -244,7 +247,7 @@ const Hero = ({onSearch}) => {
                                     <div className="mb-4">
                                         <p className="text-xs font-bold text-gray-400 mb-2 uppercase">Bedrooms</p>
                                         <div className="flex flex-wrap gap-2">
-                                            {[1,2,3,4,5,6,7,8,9,"+10"].map(num => (
+                                            {["Any",1,2,3,4,5,6,7,8,9,"+10"].map(num => (
                                                 <button key={num} onClick={() => setBeds(num)} className={`w-8 h-8 rounded-full text-xs font-bold border transition ${beds === num ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-600 border-gray-200 hover:border-blue-400'}`}>{num}</button>
                                             ))}
                                         </div>
@@ -252,7 +255,7 @@ const Hero = ({onSearch}) => {
                                     <div className="mb-4">
                                         <p className="text-xs font-bold text-gray-400 mb-2 uppercase">Bathrooms</p>
                                         <div className="flex flex-wrap gap-2">
-                                            {[1,2,3,4,5,"+6"].map(num => (
+                                            {["Any",1,2,3,4,5,"+6"].map(num => (
                                                 <button key={num} onClick={() => setBaths(num)} className={`w-8 h-8 rounded-full text-xs font-bold border transition ${baths === num ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-600 border-gray-200 hover:border-blue-400'}`}>{num}</button>
                                             ))}
                                         </div>
@@ -275,9 +278,19 @@ const Hero = ({onSearch}) => {
                                 <div className="absolute top-full right-0 md:left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 p-4 z-50">
                                     <p className="text-xs font-bold text-gray-400 mb-2 uppercase">Area (sqm)</p>
                                     <div className="flex gap-2 items-center">
-                                        <input type="number" placeholder="Min" value={area.min} onChange={e=>setArea({...area, min: e.target.value})} className="w-full border p-2 rounded text-sm"/>
+                                        <input type="number" placeholder="Min" value={area.min} onChange={e=>
+                                        {const val = e.target.value;
+                                            if (val === "" || Number(val) >= 0) {
+                                                setArea({...area, min: val});
+                                            }
+                                        }} className="w-full border p-2 rounded text-sm"/>
                                         <span className="text-gray-400">-</span>
-                                        <input type="number" placeholder="Max" value={area.max} onChange={e=>setArea({...area, max: e.target.value})} className="w-full border p-2 rounded text-sm"/>
+                                        <input type="number" placeholder="Max" value={area.max} onChange={e=>
+                                        {const val = e.target.value;
+                                            if (val === "" || Number(val) >= 0) {
+                                                setArea({...area, max: val});
+                                            }
+                                        }} className="w-full border p-2 rounded text-sm"/>
                                     </div>
                                     <div className="flex justify-end border-t pt-2 mt-3"><button onClick={() => setActivePopup(null)} className="text-sm font-bold text-blue-600 hover:underline">Done</button></div>
                                 </div>
@@ -297,9 +310,19 @@ const Hero = ({onSearch}) => {
                                 <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 p-4 z-50">
                                     <p className="text-xs font-bold text-gray-400 mb-2 uppercase">Price Range (JOD)</p>
                                     <div className="flex gap-2 items-center">
-                                        <input type="number" placeholder="Min" value={price.min} onChange={e=>setPrice({...price, min: e.target.value})} className="w-full border p-2 rounded text-sm"/>
+                                        <input type="number" placeholder="Min" value={price.min} onChange={e=>
+                                        {const val = e.target.value;
+                                            if (val === "" || Number(val) >= 0) {
+                                                setPrice({...price, min: val});
+                                            }
+                                        }} className="w-full border p-2 rounded text-sm"/>
                                         <span className="text-gray-400">-</span>
-                                        <input type="number" placeholder="Max" value={price.max} onChange={e=>setPrice({...price, max: e.target.value})} className="w-full border p-2 rounded text-sm"/>
+                                        <input type="number" placeholder="Max" value={price.max} onChange={e=>
+                                        {const val = e.target.value;
+                                            if (val === "" || Number(val) >= 0) {
+                                                setPrice({...price, max: val});
+                                            }
+                                        }} className="w-full border p-2 rounded text-sm"/>
                                     </div>
                                     <div className="flex justify-end border-t pt-2 mt-3"><button onClick={() => setActivePopup(null)} className="text-sm font-bold text-blue-600 hover:underline">Done</button></div>
                                 </div>

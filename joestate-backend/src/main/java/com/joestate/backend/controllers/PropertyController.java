@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import java.util.List;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/properties")
@@ -39,7 +40,7 @@ public class PropertyController {
 
     @PostMapping(consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     // @ModelAttribute so Spring knows to bind the Form fields to DTO
-    public ResponseEntity<String> createListing(@ModelAttribute PropertyDTO dto) {
+    public ResponseEntity<String> createListing(@Valid @ModelAttribute PropertyDTO dto) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String userEmail = auth.getName();
 

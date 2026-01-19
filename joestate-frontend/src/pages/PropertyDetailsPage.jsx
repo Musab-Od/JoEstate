@@ -161,7 +161,7 @@ const PropertyDetailsPage = () => {
                         <div className="text-center"><div className="flex items-center justify-center gap-2 text-gray-400 mb-1"><Square className="w-5 h-5"/> Area</div><span className="text-xl font-bold text-gray-900">{property.area} m²</span></div>
                     </div>
                     <div><h3 className="text-xl font-bold text-gray-900 mb-4">About this home</h3><p className="text-gray-600 leading-relaxed text-lg whitespace-pre-line">{property.description}</p></div>
-                    <div className="flex gap-6 pt-6 border-t"><div className="flex items-center gap-2 text-gray-500 text-sm"><Calendar className="w-4 h-4" /> Posted on {new Date(property.datePosted).toLocaleDateString()}</div></div>
+                    <div className="flex gap-6 pt-6 border-t"><div className="flex items-center gap-2 text-gray-500 text-sm"><Calendar className="w-4 h-4" /> Posted on {new Date(property.datePosted).toLocaleDateString('en-GB')}</div></div>
                 </div>
 
                 {/* OWNER CARD */}
