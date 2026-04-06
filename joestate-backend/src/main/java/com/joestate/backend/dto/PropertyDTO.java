@@ -3,6 +3,7 @@ package com.joestate.backend.dto;
 import com.joestate.backend.entities.Property.PropertyType;
 import com.joestate.backend.entities.Property.Purpose;
 import com.joestate.backend.entities.Property.RentFrequency;
+import com.joestate.backend.entities.Property.Status;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -35,9 +36,12 @@ public class PropertyDTO {
     private Integer roomCount;
     private Integer bathCount;
     private Boolean isFavorite;
+
     private PropertyType type;
     private Purpose purpose;
     private RentFrequency rentFrequency;
+    private Status status;
+
     private String ownerProfilePictureUrl;
 
     private List<String> imageUrls;

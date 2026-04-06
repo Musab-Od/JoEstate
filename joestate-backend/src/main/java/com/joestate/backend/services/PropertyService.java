@@ -210,6 +210,18 @@ public class PropertyService {
         // 4. Delete the property (CascadeType.ALL will automatically delete DB rows for Images & Favorites)
         propertyRepository.delete(property);
     }
+        // 5. Change property status
+    public void updatePropertyStatus(Long id, Property.Status newStatus, String userEmail) {
+        Property property = propertyRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Property not found"));
+
+        if (!property.getOwner().getEmail().equals(userEmail)) {
+            throw new RuntimeException("You do not have permission to change this status");
+        }
+
+        property.setStatus(newStatus);
+        propertyRepository.save(property);
+    }
 
     // Helper: Deletes files from the disk to save space
     private void deletePhysicalImages(List<PropertyImage> images) {
@@ -264,6 +276,7 @@ public class PropertyService {
                 .bathCount(p.getBathCount())
                 .type(p.getType())
                 .purpose(p.getPurpose())
+                .status(p.getStatus())
                 .rentFrequency(p.getRentFrequency())
                 .datePosted(p.getDatePosted())
                 .imageUrls(p.getImages().stream().map(PropertyImage::getImageUrl).collect(Collectors.toList()))

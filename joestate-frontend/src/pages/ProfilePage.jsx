@@ -28,7 +28,16 @@ const ProfilePage = () => {
                 ]);
 
                 setUser({ ...userRes.data, oldPassword: "", newPassword: "", confirmPassword: "" });
-                setMyProperties(propsRes.data);
+
+                // --- GP2: SMART SORTING ---
+                // Active on top, Sold/Rented on the bottom
+                const sortedProperties = propsRes.data.sort((a, b) => {
+                    if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1;
+                    if (a.status !== 'ACTIVE' && b.status === 'ACTIVE') return 1;
+                    return 0; // If both are same status, keep original order
+                });
+                setMyProperties(sortedProperties);
+
                 setMyFavorites(favsRes.data);
 
             } catch (err) {

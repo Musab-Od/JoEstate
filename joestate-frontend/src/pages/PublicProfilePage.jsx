@@ -20,7 +20,15 @@ const PublicProfilePage = () => {
 
                 // Fetch User Properties
                 const propRes = await axios.get(`/properties/user/${userId}`);
-                setProperties(propRes.data);
+
+                // --- GP2: SMART SORTING ---
+                const sortedProperties = propRes.data.sort((a, b) => {
+                    if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1;
+                    if (a.status !== 'ACTIVE' && b.status === 'ACTIVE') return 1;
+                    return 0;
+                });
+                setProperties(sortedProperties);
+
             } catch (err) {
                 console.error("Failed to fetch public profile", err);
             } finally {

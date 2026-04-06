@@ -117,4 +117,17 @@ public class PropertyController {
         propertyService.deleteProperty(id, userEmail);
         return ResponseEntity.ok("Property Deleted Successfully");
     }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<String> updateStatus(
+            @PathVariable Long id,
+            @RequestParam String status) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+        // Convert the string "SOLD" or "ACTIVE" to the Enum
+        Property.Status newStatus = Property.Status.valueOf(status.toUpperCase());
+        propertyService.updatePropertyStatus(id, newStatus, auth.getName());
+
+        return ResponseEntity.ok("Status Updated to " + newStatus);
+    }
 }
