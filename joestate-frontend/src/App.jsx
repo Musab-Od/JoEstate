@@ -29,6 +29,7 @@ function App() {
                         <Route path="/login" element={<AuthPage />} />
                         <Route path="/register" element={<AuthPage />} />
                         <Route path="/add-property" element={<AddPropertyPage />} />
+                        <Route path="/edit-property/:id" element={<AddPropertyPage />} />
                     </Routes>
                 </main>
 

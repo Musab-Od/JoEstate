@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "../api/axios";
-import { MapPin, BedDouble, Bath, Square, Phone, MessageCircle, Heart, Share2, Calendar, X, ChevronLeft, ChevronRight, Grid, User } from "lucide-react";
+import { MapPin, BedDouble, Bath, Square, Phone, MessageCircle, Heart, Share2, Calendar, X, ChevronLeft, ChevronRight, Grid, User, Trash2, Edit } from "lucide-react";
 
 const PropertyDetailsPage = () => {
     const { id } = useParams();
@@ -67,6 +67,25 @@ const PropertyDetailsPage = () => {
     const handleShare = () => {
         navigator.clipboard.writeText(window.location.href);
         alert("Link copied to clipboard!");
+    };
+
+    const handleDelete = async () => {
+        if (window.confirm("Are you sure you want to delete this listing? This action cannot be undone.")) {
+            try {
+                const token = localStorage.getItem("token");
+                await axios.delete(`/properties/${id}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                alert("Property deleted successfully.");
+                navigate("/profile"); // Send them back to their dashboard
+            } catch (err) {
+                alert("Failed to delete property.");
+            }
+        }
+    };
+
+    const handleEdit = () => {
+        navigate(`/edit-property/${id}`);
     };
 
     // INTELLIGENT NAVIGATION
@@ -167,20 +186,32 @@ const PropertyDetailsPage = () => {
                 {/* OWNER CARD */}
                 <div className="relative">
                     <div className="sticky top-24 bg-white rounded-3xl shadow-xl border border-gray-100 p-6">
+
+                        {/* PRICE & FAVORITE */}
                         <div className="flex justify-between items-start mb-6">
-                            <div><p className="text-sm text-gray-500 font-medium uppercase mb-1">Price</p><h2 className="text-3xl font-extrabold text-blue-600">{formatPrice(property.price)} <span className="text-lg text-gray-400 font-normal">JOD</span></h2></div>
-                            <button onClick={toggleFavorite} className={`p-3 rounded-full transition-colors ${isLiked ? "bg-red-50 text-red-500 border border-red-200" : "bg-gray-50 text-gray-400 hover:text-red-500 hover:bg-red-50"}`}>
-                                <Heart className={`w-6 h-6 ${isLiked ? "fill-red-500" : ""}`} />
-                            </button>
+                            <div>
+                                <p className="text-sm text-gray-500 font-medium uppercase mb-1">Price</p>
+                                <h2 className="text-3xl font-extrabold text-blue-600">
+                                    {formatPrice(property.price)} <span className="text-lg text-gray-400 font-normal">JOD</span>
+                                </h2>
+                            </div>
+
+                            {/* Hide favorite button if it's the owner's own property */}
+                            {!(currentUser && currentUser.userId === property.ownerId) && (
+                                <button onClick={toggleFavorite} className={`p-3 rounded-full transition-colors ${isLiked ? "bg-red-50 text-red-500 border border-red-200" : "bg-gray-50 text-gray-400 hover:text-red-500 hover:bg-red-50"}`}>
+                                    <Heart className={`w-6 h-6 ${isLiked ? "fill-red-500" : ""}`} />
+                                </button>
+                            )}
                         </div>
+
                         <hr className="border-gray-100 my-6" />
 
-                        {/* OWNER SECTION */}
+                        {/* OWNER PROFILE SECTION */}
                         <div
                             onClick={handleOwnerClick}
                             className="flex items-center gap-4 mb-6 cursor-pointer group p-2 -mx-2 rounded-xl hover:bg-gray-50 transition"
                         >
-                            <div className="w-14 h-14 rounded-full flex items-center justify-center overflow-hidden border border-gray-200 group-hover:ring-2 ring-blue-500 transition">
+                            <div className="w-14 h-14 shrink-0 rounded-full flex items-center justify-center overflow-hidden border border-gray-200 group-hover:ring-2 ring-blue-500 transition">
                                 {ownerAvatar ? (
                                     <img src={ownerAvatar} alt="Owner" className="w-full h-full object-cover" />
                                 ) : (
@@ -189,22 +220,46 @@ const PropertyDetailsPage = () => {
                                     </div>
                                 )}
                             </div>
-                            <div>
+                            <div className="flex-grow">
                                 <p className="text-gray-400 text-xs font-bold uppercase group-hover:text-blue-600 transition">Listed by</p>
-                                <p className="text-gray-900 font-bold text-lg">{property.ownerName}</p>
-                                <p className="text-xs text-blue-500 font-bold opacity-0 group-hover:opacity-100 transition -mt-1">View Profile</p>
+                                <p className="text-gray-900 font-bold text-lg leading-tight">{property.ownerName}</p>
+                                <p className="text-xs text-blue-500 font-bold opacity-0 group-hover:opacity-100 transition mt-1">View Profile</p>
                             </div>
                         </div>
 
-                        <div className="space-y-3">
-                            <button onClick={() => setShowPhone(!showPhone)} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-200"><Phone className="w-5 h-5" /> {showPhone ? property.ownerPhone : "Show Phone Number"}</button>
-                            <button className="w-full py-4 bg-white border-2 border-gray-200 text-gray-700 font-bold rounded-xl flex items-center justify-center gap-2 hover:border-gray-300 hover:bg-gray-50 transition-all"><MessageCircle className="w-5 h-5" /> Chat with Owner</button>
-                        </div>
+                        {/* DYNAMIC ACTION BUTTONS */}
+                        {currentUser && currentUser.userId === property.ownerId ? (
+                            /* --- UI FOR THE OWNER --- */
+                            <div className="space-y-3">
+                                <div className="bg-blue-50 text-blue-700 text-sm font-bold px-4 py-3 rounded-xl mb-4 text-center border border-blue-100">
+                                    This is your property listing.
+                                </div>
+                                <button onClick={handleEdit} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-200">
+                                    <Edit className="w-5 h-5" /> Edit Listing
+                                </button>
+                                <button onClick={handleDelete} className="w-full py-4 bg-white border-2 border-red-100 text-red-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:border-red-200 hover:bg-red-50 transition-all">
+                                    <Trash2 className="w-5 h-5" /> Delete Property
+                                </button>
+                            </div>
+                        ) : (
+                            /* --- UI FOR NORMAL VISITORS --- */
+                            <div className="space-y-3">
+                                <button onClick={() => setShowPhone(!showPhone)} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-200">
+                                    <Phone className="w-5 h-5" /> {showPhone ? property.ownerPhone : "Show Phone Number"}
+                                </button>
+                                <button className="w-full py-4 bg-white border-2 border-gray-200 text-gray-700 font-bold rounded-xl flex items-center justify-center gap-2 hover:border-gray-300 hover:bg-gray-50 transition-all">
+                                    <MessageCircle className="w-5 h-5" /> Chat with Owner
+                                </button>
+                            </div>
+                        )}
+
+                        {/* SHARE BUTTON */}
                         <div className="mt-6 text-center">
                             <button onClick={handleShare} className="text-sm text-gray-400 hover:text-gray-600 flex items-center justify-center gap-2 w-full active:scale-95 transition">
                                 <Share2 className="w-4 h-4" /> Share this property
                             </button>
                         </div>
+
                     </div>
                 </div>
 

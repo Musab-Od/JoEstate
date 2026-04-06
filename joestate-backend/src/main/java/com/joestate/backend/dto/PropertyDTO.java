@@ -41,6 +41,7 @@ public class PropertyDTO {
     private String ownerProfilePictureUrl;
 
     private List<String> imageUrls;
+    private List<String> existingImageUrls;
 
     @JsonIgnore
     private List<MultipartFile> imageFiles;

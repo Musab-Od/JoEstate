@@ -92,4 +92,29 @@ public class PropertyController {
     public ResponseEntity<List<PropertyDTO>> getUserProperties(@PathVariable Long userId) {
         return ResponseEntity.ok(propertyService.getPublicUserProperties(userId));
     }
+
+    // ==========================================
+    // EDIT AND DELETE ENDPOINTS
+    // ==========================================
+
+    @PutMapping(value = "/{id}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    public ResponseEntity<String> updateListing(
+            @PathVariable Long id,
+            @Valid @ModelAttribute PropertyDTO dto) {
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String userEmail = auth.getName();
+
+        propertyService.updateProperty(id, dto, userEmail);
+        return ResponseEntity.ok("Property Updated Successfully");
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteListing(@PathVariable Long id) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String userEmail = auth.getName();
+
+        propertyService.deleteProperty(id, userEmail);
+        return ResponseEntity.ok("Property Deleted Successfully");
+    }
 }

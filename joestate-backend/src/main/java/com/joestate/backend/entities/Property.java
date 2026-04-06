@@ -46,10 +46,10 @@ public class Property {
         datePosted = LocalDateTime.now();
     }
 
-    @OneToMany(mappedBy = "property", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Favorite> favoritedBy;
 
-    @OneToMany(mappedBy = "property", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PropertyImage> images;
 
     public enum PropertyType { APARTMENT, VILLA, HOUSE, CHALET, STUDIO, SHOP, OFFICE, WAREHOUSE, FARM, LAND }

@@ -146,7 +146,87 @@ public class PropertyService {
     }
 
     // ==========================================
-    // 3. PRIVATE HELPERS
+    // 3. UPDATE AND DELETE LOGIC
+    // ==========================================
+
+    public void updateProperty(Long id, PropertyDTO dto, String userEmail) {
+        // 1. Find the property
+        Property property = propertyRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Property not found"));
+
+        // 2. Verify Ownership
+        if (!property.getOwner().getEmail().equals(userEmail)) {
+            throw new RuntimeException("You do not have permission to edit this property");
+        }
+
+        // 3. Update Text Fields
+        property.setTitle(dto.getTitle());
+        property.setDescription(dto.getDescription());
+        property.setPrice(dto.getPrice());
+        property.setArea(dto.getArea());
+        property.setLocation(dto.getLocation());
+        property.setRoomCount(dto.getRoomCount());
+        property.setBathCount(dto.getBathCount());
+        property.setType(dto.getType());
+        property.setPurpose(dto.getPurpose());
+
+        if (dto.getPurpose() == Property.Purpose.BUY) {
+            property.setRentFrequency(Property.RentFrequency.NONE);
+        } else {
+            property.setRentFrequency(dto.getRentFrequency());
+        }
+
+        // 1. Identify which images to DELETE (those not in the 'keep' list)
+        List<PropertyImage> toDelete = property.getImages().stream()
+                .filter(img -> dto.getExistingImageUrls() == null ||
+                        !dto.getExistingImageUrls().contains(img.getImageUrl()))
+                .collect(Collectors.toList());
+
+        // 2. Remove them from disk and the DB list
+        deletePhysicalImages(toDelete);
+        property.getImages().removeAll(toDelete);
+
+        // 3. Add any NEW images uploaded
+        if (dto.getImageFiles() != null && !dto.getImageFiles().isEmpty()) {
+            saveImages(dto.getImageFiles(), property);
+        }
+
+        propertyRepository.save(property);
+    }
+
+    public void deleteProperty(Long id, String userEmail) {
+        // 1. Find the property
+        Property property = propertyRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Property not found"));
+
+        // 2. Verify Ownership
+        if (!property.getOwner().getEmail().equals(userEmail)) {
+            throw new RuntimeException("You do not have permission to delete this property");
+        }
+
+        // 3. Delete physical image files from the hard drive
+        deletePhysicalImages(property.getImages());
+
+        // 4. Delete the property (CascadeType.ALL will automatically delete DB rows for Images & Favorites)
+        propertyRepository.delete(property);
+    }
+
+    // Helper: Deletes files from the disk to save space
+    private void deletePhysicalImages(List<PropertyImage> images) {
+        if (images == null) return;
+        Path uploadPath = Paths.get(UPLOAD_DIR);
+        for (PropertyImage img : images) {
+            try {
+                Path filePath = uploadPath.resolve(img.getImageUrl());
+                Files.deleteIfExists(filePath);
+            } catch (IOException e) {
+                System.out.println("Could not delete file: " + img.getImageUrl());
+            }
+        }
+    }
+
+    // ==========================================
+    // 4. PRIVATE HELPERS
     // ==========================================
 
     // Helper: Find IDs of properties liked by the currently logged-in user
