@@ -68,6 +68,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/properties/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/properties/**").authenticated()
                         .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers("/ws/**").permitAll()
                         // 4. Everything else requires login
                         .anyRequest().authenticated()
                 );

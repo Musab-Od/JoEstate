@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "../api/axios";
-import { User, LogOut, Menu, PlusCircle, Globe, Building2, ChevronDown, LayoutDashboard, Heart } from "lucide-react";
+import { User, LogOut, Menu, PlusCircle, Globe, Building2, ChevronDown, LayoutDashboard, Heart, Bell } from "lucide-react";
 
 const Header = () => {
     const navigate = useNavigate();
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userName, setUserName] = useState("");
     const [avatarUrl, setAvatarUrl] = useState(null);
-    const [language, setLanguage] = useState("EN");
+    // const [language, setLanguage] = useState("EN");
 
     // Menus State
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -20,9 +20,9 @@ const Header = () => {
     useEffect(() => {
         const token = localStorage.getItem("token");
         const storedUser = localStorage.getItem("user");
-        const savedLang = localStorage.getItem("lang");
+        // const savedLang = localStorage.getItem("lang");
 
-        if (savedLang) setLanguage(savedLang);
+        // if (savedLang) setLanguage(savedLang);
 
         if (token) {
             setIsLoggedIn(true);
@@ -65,11 +65,11 @@ const Header = () => {
         window.location.reload(); // Ensure clean state
     };
 
-    const toggleLanguage = () => {
-        const newLang = language === "EN" ? "AR" : "EN";
-        setLanguage(newLang);
-        localStorage.setItem("lang", newLang);
-    };
+    // const toggleLanguage = () => {
+    //     const newLang = language === "EN" ? "AR" : "EN";
+    //     setLanguage(newLang);
+    //     localStorage.setItem("lang", newLang);
+    // };
 
     const handleAddPropertyClick = (e) => {
         e.preventDefault();
@@ -109,11 +109,22 @@ const Header = () => {
                 {/* 3. Right Section */}
                 <div className="flex items-center gap-4">
 
-                    {/* Language */}
-                    <button onClick={toggleLanguage} className="hidden md:flex items-center gap-1.5 text-gray-500 hover:text-blue-600 transition text-sm font-bold border px-3 py-1.5 rounded-full hover:border-blue-200">
-                        <Globe className="w-4 h-4" />
-                        <span>{language}</span>
-                    </button>
+                    {/*/!* Language *!/*/}
+                    {/*<button onClick={toggleLanguage} className="hidden md:flex items-center gap-1.5 text-gray-500 hover:text-blue-600 transition text-sm font-bold border px-3 py-1.5 rounded-full hover:border-blue-200">*/}
+                    {/*    <Globe className="w-4 h-4" />*/}
+                    {/*    <span>{language}</span>*/}
+                    {/*</button>*/}
+
+                    {/* Notifications / Messages */}
+                    {isLoggedIn && (
+                        <Link to="/messages" className="hidden md:flex items-center justify-center text-gray-500 hover:text-blue-600 transition relative p-2 rounded-full hover:bg-blue-50">
+                            <Bell className="w-5 h-5" />
+                            {/* Note: Static '3' here for now. We will make it dynamic later! */}
+                            <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
+                                3
+                            </span>
+                        </Link>
+                    )}
 
                     {/* Add Property Button */}
                     <button

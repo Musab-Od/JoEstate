@@ -78,6 +78,26 @@ const PropertyDetailsPage = () => {
         navigate(`/edit-property/${id}`);
     };
 
+    const handleStartChat = async () => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            navigate("/login");
+            return;
+        }
+        try {
+            // Call the backend to get or create the thread ID
+            const res = await axios.post(`/chat/start/${id}`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const threadId = res.data;
+            // Teleport the user to the messages page with the thread ID in the URL
+            navigate(`/messages?thread=${threadId}`);
+        } catch (err) {
+            console.error(err);
+            alert("Failed to start chat. Please try again.");
+        }
+    };
+
     // --- GP2: STATUS CHANGE HANDLER ---
     const handleStatusChange = async (newStatus) => {
         if (window.confirm(`Are you sure you want to mark this as ${newStatus}?`)) {
@@ -256,7 +276,7 @@ const PropertyDetailsPage = () => {
                                     <button onClick={() => setShowPhone(!showPhone)} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-200">
                                         <Phone className="w-5 h-5" /> {showPhone ? property.ownerPhone : "Show Phone Number"}
                                     </button>
-                                    <button className="w-full py-4 bg-white border-2 border-gray-200 text-gray-700 font-bold rounded-xl flex items-center justify-center gap-2 hover:border-gray-300 hover:bg-gray-50 transition-all">
+                                    <button onClick={handleStartChat} className="w-full py-4 bg-white border-2 border-gray-200 text-gray-700 font-bold rounded-xl flex items-center justify-center gap-2 hover:border-gray-300 hover:bg-gray-50 transition-all">
                                         <MessageCircle className="w-5 h-5" /> Chat with Owner
                                     </button>
                                 </div>
