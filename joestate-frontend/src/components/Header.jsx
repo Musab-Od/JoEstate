@@ -1,60 +1,95 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "../api/axios";
-import { User, LogOut, Menu, PlusCircle, Globe, Building2, ChevronDown, LayoutDashboard, Heart, Bell } from "lucide-react";
+import { User, LogOut, Menu, PlusCircle, Building2, ChevronDown, LayoutDashboard, Bell, MessageCircle, Heart, MessageSquare } from "lucide-react";
+import { useWebSocket } from "../context/WebSocketContext";
 
 const Header = () => {
     const navigate = useNavigate();
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userName, setUserName] = useState("");
     const [avatarUrl, setAvatarUrl] = useState(null);
-    // const [language, setLanguage] = useState("EN");
 
     // Menus State
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
 
-    const dropdownRef = useRef(null);
+    // Notification State
+    const [isNotifOpen, setIsNotifOpen] = useState(false);
+    const [notifications, setNotifications] = useState([]);
 
-    // Load User Data & Fetch Avatar
+    const { unreadMessages, notifTrigger } = useWebSocket(); // Global chat messages count
+
+    const dropdownRef = useRef(null);
+    const notifRef = useRef(null);
+
+    // 1. Load User Data & Fetch Notifications
     useEffect(() => {
         const token = localStorage.getItem("token");
         const storedUser = localStorage.getItem("user");
-        // const savedLang = localStorage.getItem("lang");
-
-        // if (savedLang) setLanguage(savedLang);
 
         if (token) {
             setIsLoggedIn(true);
             setUserName(storedUser || "User");
 
-            // FETCH REAL USER DATA (Avatar)
-            axios.get("/users/me", {
-                headers: { Authorization: `Bearer ${token}` }
-            })
+            // Fetch User Avatar
+            axios.get("/users/me", { headers: { Authorization: `Bearer ${token}` } })
                 .then(res => {
-                    // Update name just in case it changed
                     setUserName(res.data.firstName);
-
-                    // Set Avatar if it exists
                     if (res.data.profilePictureUrl) {
                         setAvatarUrl(`http://localhost:8080/uploads/${res.data.profilePictureUrl}`);
                     }
                 })
-                .catch(err => {
-                    console.error("Failed to fetch user info for header", err);
-                });
+                .catch(err => console.error("Failed to fetch user info", err));
+
+            // Fetch Initial Notifications
+            fetchNotifications(token);
         }
 
-        // Click outside listener
+        // Click outside listener for BOTH dropdowns
         const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setIsUserDropdownOpen(false);
-            }
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setIsUserDropdownOpen(false);
+            if (notifRef.current && !notifRef.current.contains(event.target)) setIsNotifOpen(false);
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (token) fetchNotifications(token);
+    }, [notifTrigger]); // This makes the Bell update live without refreshing!
+
+    const fetchNotifications = async (token) => {
+        try {
+            const res = await axios.get("/notifications", { headers: { Authorization: `Bearer ${token}` } });
+            setNotifications(res.data);
+        } catch (err) {
+            console.error("Failed to fetch notifications", err);
+        }
+    };
+
+    // 2. Handle "Message Buyer" click from the notification dropdown
+    const handleMessageBuyer = async (propertyId, buyerEmail, notificationId) => {
+        const token = localStorage.getItem("token");
+        try {
+            // A. Mark notification as read
+            await axios.put(`/notifications/${notificationId}/read`, {}, { headers: { Authorization: `Bearer ${token}` } });
+
+            // B. Create/Get chat thread with the buyer
+            const res = await axios.post(`/chat/start/${propertyId}/with-buyer?buyerEmail=${buyerEmail}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+            const threadId = res.data;
+
+            // C. Close dropdown and navigate to chat
+            setIsNotifOpen(false);
+            navigate(`/messages?thread=${threadId}`);
+
+            // D. Refresh notifications locally to remove the red dot
+            setNotifications(prev => prev.map(n => n.notificationId === notificationId ? { ...n, read: true } : n));
+        } catch (err) {
+            console.error("Failed to start chat with buyer", err);
+        }
+    };
 
     const handleLogout = () => {
         localStorage.removeItem("token");
@@ -62,23 +97,15 @@ const Header = () => {
         setIsLoggedIn(false);
         setAvatarUrl(null);
         navigate("/");
-        window.location.reload(); // Ensure clean state
+        window.location.reload();
     };
-
-    // const toggleLanguage = () => {
-    //     const newLang = language === "EN" ? "AR" : "EN";
-    //     setLanguage(newLang);
-    //     localStorage.setItem("lang", newLang);
-    // };
 
     const handleAddPropertyClick = (e) => {
         e.preventDefault();
-        if (isLoggedIn) {
-            navigate("/add-property");
-        } else {
-            navigate("/register");
-        }
+        isLoggedIn ? navigate("/add-property") : navigate("/register");
     };
+
+    const unreadNotifsCount = notifications.filter(n => !n.read).length;
 
     return (
         <header className="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b border-gray-100">
@@ -109,21 +136,81 @@ const Header = () => {
                 {/* 3. Right Section */}
                 <div className="flex items-center gap-4">
 
-                    {/*/!* Language *!/*/}
-                    {/*<button onClick={toggleLanguage} className="hidden md:flex items-center gap-1.5 text-gray-500 hover:text-blue-600 transition text-sm font-bold border px-3 py-1.5 rounded-full hover:border-blue-200">*/}
-                    {/*    <Globe className="w-4 h-4" />*/}
-                    {/*    <span>{language}</span>*/}
-                    {/*</button>*/}
-
-                    {/* Notifications / Messages */}
                     {isLoggedIn && (
-                        <Link to="/messages" className="hidden md:flex items-center justify-center text-gray-500 hover:text-blue-600 transition relative p-2 rounded-full hover:bg-blue-50">
-                            <Bell className="w-5 h-5" />
-                            {/* Note: Static '3' here for now. We will make it dynamic later! */}
-                            <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
-                                3
-                            </span>
-                        </Link>
+                        <div className="hidden md:flex items-center gap-2 mr-2">
+                            {/* A. Chat Messages Icon */}
+                            <Link to="/messages" className="relative p-2 text-gray-500 hover:text-blue-600 transition rounded-full hover:bg-blue-50">
+                                <MessageCircle className="w-5 h-5" />
+                                {unreadMessages > 0 && (
+                                    <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
+                                        {unreadMessages}
+                                    </span>
+                                )}
+                            </Link>
+
+                            {/* B. System Notifications (Bell) Icon */}
+                            <div className="relative" ref={notifRef}>
+                                <button onClick={() => {
+                                    setIsNotifOpen(!isNotifOpen);
+                                    // NEW: If we are opening the menu and there are unread notifications, clear them!
+                                    if (!isNotifOpen && unreadNotifsCount > 0) {
+                                        const token = localStorage.getItem("token");
+                                        axios.put("/notifications/read-all", {}, { headers: { Authorization: `Bearer ${token}` }})
+                                            .catch(err => console.error("Failed to mark read", err));
+
+                                        // Instantly turn off the red bubble in the UI
+                                        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+                                    }
+                                }} className="relative p-2 text-gray-500 hover:text-blue-600 transition rounded-full hover:bg-blue-50">
+                                    <Bell className="w-5 h-5" />
+                                    {unreadNotifsCount > 0 && (
+                                        <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">
+                                            {unreadNotifsCount}
+                                        </span>
+                                    )}
+                                </button>
+
+                                {/* Notification Dropdown Menu */}
+                                {isNotifOpen && (
+                                    <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 py-2 animate-in fade-in slide-in-from-top-2 z-50">
+                                        <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                                            <h3 className="font-bold text-gray-800">Notifications</h3>
+                                            <span className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded-md">{unreadNotifsCount} New</span>
+                                        </div>
+
+                                        <div className="max-h-80 overflow-y-auto overscroll-contain">
+                                            {notifications.length === 0 ? (
+                                                <div className="p-4 text-center text-sm text-gray-500">No new notifications</div>
+                                            ) : (
+                                                notifications.map(notif => (
+                                                    <div key={notif.notificationId} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition ${!notif.read ? 'bg-blue-50/30' : ''}`}>
+                                                        <div className="flex gap-3">
+                                                            <div className="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center shrink-0 border border-pink-200">
+                                                                {notif.senderAvatarUrl ? <img src={`http://localhost:8080/uploads/${notif.senderAvatarUrl}`} alt="User" className="w-full h-full rounded-full object-cover" /> : <Heart className="w-5 h-5 text-pink-500 fill-current" />}
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm text-gray-800">{notif.content}</p>
+                                                                <p className="text-[10px] text-gray-400 mt-1">{new Date(notif.createdAt).toLocaleDateString()}</p>
+
+                                                                {/* Interactive Action: Message Buyer */}
+                                                                {notif.type === 'FAVORITE' && notif.senderEmail && (
+                                                                    <button
+                                                                        onClick={() => handleMessageBuyer(notif.relatedId, notif.senderEmail, notif.notificationId)}
+                                                                        className="mt-2 text-xs flex items-center gap-1 font-bold text-blue-600 hover:text-blue-800 transition"
+                                                                    >
+                                                                        <MessageSquare className="w-3 h-3" /> Message {notif.senderName}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     )}
 
                     {/* Add Property Button */}
@@ -138,42 +225,23 @@ const Header = () => {
                     {/* USER LOGIC */}
                     {isLoggedIn ? (
                         <div className="relative" ref={dropdownRef}>
-                            {/* User Trigger */}
-                            <button
-                                onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                                className="flex items-center gap-3 pl-4 border-l border-gray-200 ml-2 hover:opacity-80 transition"
-                            >
+                            <button onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)} className="flex items-center gap-3 pl-4 border-l border-gray-200 ml-2 hover:opacity-80 transition">
                                 <div className="text-right hidden md:block">
                                     <p className="text-[10px] uppercase text-gray-400 font-bold tracking-wider">Hello</p>
                                     <p className="text-sm font-bold text-gray-800 leading-none">{userName}</p>
                                 </div>
-
-                                {/* AVATAR OR ICON Logic */}
                                 <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
-                                    {avatarUrl ? (
-                                        <img src={avatarUrl} alt="User" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <User className="w-5 h-5 text-gray-500" />
-                                    )}
+                                    {avatarUrl ? <img src={avatarUrl} alt="User" className="w-full h-full object-cover" /> : <User className="w-5 h-5 text-gray-500" />}
                                 </div>
-
                                 <ChevronDown className={`w-4 h-4 text-gray-400 transition transform ${isUserDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
 
-                            {/* Dropdown Menu */}
                             {isUserDropdownOpen && (
-                                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 animate-in fade-in slide-in-from-top-2">
+                                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 animate-in fade-in slide-in-from-top-2 z-50">
                                     <Link to="/profile" className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-medium">
                                         <LayoutDashboard className="w-4 h-4" /> My Profile
                                     </Link>
-
-                                    {/*/!*  Favorites Link *!/*/}
-                                    {/*<Link to="/favorites" className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-medium">*/}
-                                    {/*    <Heart className="w-4 h-4" /> My Favorites*/}
-                                    {/*</Link>*/}
-
                                     <div className="border-t border-gray-100 my-1"></div>
-
                                     <button onClick={handleLogout} className="w-full text-left flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 font-medium">
                                         <LogOut className="w-4 h-4" /> Logout
                                     </button>
@@ -181,11 +249,8 @@ const Header = () => {
                             )}
                         </div>
                     ) : (
-                        // Guest Links
                         <div className="flex items-center gap-3 pl-2">
-                            <Link to="/login" className="text-gray-600 hover:text-blue-600 font-semibold text-sm transition">
-                                Log In
-                            </Link>
+                            <Link to="/login" className="text-gray-600 hover:text-blue-600 font-semibold text-sm transition">Log In</Link>
                         </div>
                     )}
 

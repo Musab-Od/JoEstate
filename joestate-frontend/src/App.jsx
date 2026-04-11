@@ -11,6 +11,7 @@ import PropertyDetailsPage from "./pages/PropertyDetailsPage";
 import ProfilePage from "./pages/ProfilePage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 import MessagesPage from "./pages/MessagesPage";
+import { WebSocketProvider } from "./context/WebSocketContext";
 
 // We create an inner component so we can use "useLocation()"
 const AppContent = () => {
@@ -49,7 +50,9 @@ const AppContent = () => {
 function App() {
     return (
         <BrowserRouter>
-            <AppContent />
+            <WebSocketProvider>
+                    <AppContent />
+            </WebSocketProvider>
         </BrowserRouter>
     );
 }

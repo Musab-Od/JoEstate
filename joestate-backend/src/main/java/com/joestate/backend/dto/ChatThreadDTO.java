@@ -23,6 +23,7 @@ public class ChatThreadDTO {
 
     // --- The "Other" Person (Who am I talking to?) ---
     private Long otherUserId;
+    private String otherUserEmail;
     private String otherUserName;
     private String otherUserAvatarUrl;
 

@@ -9,7 +9,6 @@ import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,6 +32,14 @@ public class ChatController {
         return ResponseEntity.ok(threadId);
     }
 
+    // 1.5 Start a chat as an OWNER (Initiating with a specific buyer who favorited the property)
+    @PostMapping("/start/{propertyId}/with-buyer")
+    public ResponseEntity<Long> startThreadWithOwner(@PathVariable Long propertyId, @RequestParam String buyerEmail) {
+        // We still use startOrGetThread, but we explicitly pass the buyer's email, not the owner's!
+        Long threadId = chatService.startOrGetThread(propertyId, buyerEmail);
+        return ResponseEntity.ok(threadId);
+    }
+
     // 2. Fetch Inbox
     @GetMapping("/inbox")
     public ResponseEntity<List<ChatThreadDTO>> getInbox() {
@@ -47,16 +54,22 @@ public class ChatController {
         return ResponseEntity.ok(chatService.getChatHistory(threadId, email));
     }
 
-    // 4. THE LIVE WEBSOCKET ENDPOINT (Receives message, saves to DB, broadcasts to receiver)
+    // 4. THE LIVE WEBSOCKET ENDPOINT
     @MessageMapping("/chat/{threadId}/send")
     public void sendLiveMessage(@DestinationVariable Long threadId, @Payload Map<String, String> payload) {
         String senderEmail = payload.get("senderEmail");
         String content = payload.get("content");
 
+        // React will tell us who the receiver is!
+        String receiverEmail = payload.get("receiverEmail");
+
         // Save to Database
         MessageDTO savedMessage = chatService.saveMessage(threadId, senderEmail, content);
 
-        // Broadcast to anyone listening to this specific thread room!
+        // Broadcast to anyone listening to this specific thread room (For the Chat UI)
         messagingTemplate.convertAndSend("/topic/thread/" + threadId, savedMessage);
+
+        // Broadcast a global alert to the receiver's personal channel!
+        messagingTemplate.convertAndSend("/topic/user/" + receiverEmail, "{\"type\":\"NEW_MESSAGE\"}");
     }
 }

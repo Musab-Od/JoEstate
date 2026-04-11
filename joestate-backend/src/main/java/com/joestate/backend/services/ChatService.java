@@ -130,6 +130,7 @@ public class ChatService {
                 .propertyPrice(thread.getProperty().getPrice())
                 .propertyImageUrl(thread.getProperty().getImages().isEmpty() ? null : thread.getProperty().getImages().get(0).getImageUrl())
                 .otherUserId(otherUser.getUserId())
+                .otherUserEmail(otherUser.getEmail())
                 .otherUserName(otherUser.getFirstName() + " " + otherUser.getLastName())
                 .otherUserAvatarUrl(otherUser.getProfilePictureUrl())
                 .lastMessage(lastMessageText)

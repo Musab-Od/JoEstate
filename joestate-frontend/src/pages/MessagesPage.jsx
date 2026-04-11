@@ -4,12 +4,14 @@ import axios from "../api/axios";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client/dist/sockjs";
 import { Send, Image as ImageIcon, Info, User } from "lucide-react";
+import { useWebSocket } from "../context/WebSocketContext"
 
 const MessagesPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const urlThreadId = queryParams.get("thread");
+    const { setUnreadMessages } = useWebSocket();
 
     const [inbox, setInbox] = useState([]);
     const [activeThread, setActiveThread] = useState(null);
@@ -70,10 +72,17 @@ const MessagesPage = () => {
     useEffect(() => {
         if (!activeThread) return;
 
-        // Clear the unread count in the UI the moment we open this chat
-        setInbox(prevInbox => prevInbox.map(thread =>
-            thread.threadId === activeThread.threadId ? { ...thread, unreadCount: 0 } : thread
-        ));
+// Clear the unread count in the UI the moment we open this chat
+        setInbox(prevInbox => {
+            const currentThread = prevInbox.find(t => t.threadId === activeThread.threadId);
+            if (currentThread && currentThread.unreadCount > 0) {
+                // Decrement the global red bubble in the Header!
+                setUnreadMessages(prev => Math.max(0, prev - 1));
+            }
+            return prevInbox.map(thread =>
+                thread.threadId === activeThread.threadId ? { ...thread, unreadCount: 0 } : thread
+            );
+        });
 
         const client = new Client({
             webSocketFactory: () => new SockJS("http://localhost:8080/ws"),
@@ -121,6 +130,7 @@ const MessagesPage = () => {
 
         const messagePayload = {
             senderEmail: myEmail,
+            receiverEmail: activeThread.otherUserEmail,
             content: newMessage.trim()
         };
 

@@ -29,6 +29,8 @@ public class PropertyService {
     private final PropertyImageRepository propertyImageRepository;
     private final FavoriteRepository favoriteRepository;
 
+    private final NotificationService notificationService;
+
     private final String UPLOAD_DIR = "uploads/";
 
     // ==========================================
@@ -103,9 +105,16 @@ public class PropertyService {
         Optional<Favorite> existingFav = favoriteRepository.findByUser_EmailAndProperty_PropertyId(email, propertyId);
 
         if (existingFav.isPresent()) {
+            // --- SCENARIO 1: THEY UN-FAVORITED THE PROPERTY ---
             favoriteRepository.delete(existingFav.get());
+
+            // Delete the notification so it disappears from the owner's bell!
+            notificationService.deleteFavoriteNotification(propertyId, email);
+
             return false; // Result: Unliked
+
         } else {
+            // --- SCENARIO 2: THEY FAVORITED THE PROPERTY ---
             User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new RuntimeException("User not found"));
             Property property = propertyRepository.findById(propertyId)
@@ -115,6 +124,10 @@ public class PropertyService {
             favorite.setUser(user);
             favorite.setProperty(property);
             favoriteRepository.save(favorite);
+
+            // Fire the notification to the owner!
+            notificationService.createFavoriteNotification(propertyId, email);
+
             return true; // Result: Liked
         }
     }
