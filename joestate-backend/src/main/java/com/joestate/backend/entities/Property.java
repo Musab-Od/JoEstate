@@ -57,6 +57,6 @@ public class Property {
 
     public enum PropertyType { APARTMENT, VILLA, HOUSE, CHALET, STUDIO, SHOP, OFFICE, WAREHOUSE, FARM, LAND }
     public enum Purpose { RENT, BUY }
-    public enum Status { ACTIVE, SOLD, RENTED }
+    public enum Status { ACTIVE, SOLD, RENTED, SUSPENDED }
     public enum RentFrequency { DAILY, WEEKLY, MONTHLY, YEARLY, NONE }
 }

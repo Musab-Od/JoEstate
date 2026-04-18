@@ -69,6 +69,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/properties/**").authenticated()
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()
+                        // Only users whose role translates to 'ADMIN' can pass this line
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // 4. Everything else requires login
                         .anyRequest().authenticated()
                 );

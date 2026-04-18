@@ -46,14 +46,22 @@ public class AuthService {
 
     // Login Logic
     public AuthResponse login(LoginRequest request) {
+
+        // 1. Fetch the user from the database FIRST
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Invalid email or password"));
 
-        // Check password manually
+        // 2. NOW check if they are banned (before checking password or making a token)
+        if (user.isBanned()) {
+            throw new RuntimeException("Your account has been suspended for violating terms of service.");
+        }
+
+        // 3. Check password manually
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new RuntimeException("Invalid email or password");
         }
 
+        // 4. Generate token and return response
         String token = jwtUtils.generateToken(user.getEmail());
 
         return AuthResponse.builder()
