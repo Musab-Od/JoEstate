@@ -67,13 +67,16 @@ const SearchResultCard = ({ property, isFavorited = null, onFavoriteToggle }) =>
             <div className="w-full md:w-64 h-48 md:h-auto flex-shrink-0 relative rounded-xl overflow-hidden">
                 <img src={mainImage} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
 
-                <div className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded uppercase">
-                    {property.purpose === 'BUY' ? 'Sale' : 'Rent'}
-                </div>
+                {/* ONLY SHOW SALE/RENT IF ACTIVE */}
+                {isActive && (
+                    <div className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded uppercase shadow-md z-10">
+                        {property.purpose === 'BUY' ? 'Sale' : 'Rent'}
+                    </div>
+                )}
 
-                {/* GP2: SOLD / RENTED BADGE */}
+                {/* IF NOT ACTIVE, SHOW THE EXACT STATUS (SOLD, RENTED, OR SUSPENDED) */}
                 {!isActive && (
-                    <div className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded uppercase shadow-md flex items-center gap-1 z-10">
+                    <div className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded uppercase shadow-md flex items-center gap-1 z-10">
                         <CheckCircle className="w-3 h-3" /> {property.status}
                     </div>
                 )}

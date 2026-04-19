@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import axios from "../api/axios";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client/dist/sockjs";
@@ -166,7 +166,13 @@ const MessagesPage = () => {
                                 </div>
                                 <div className="flex-grow overflow-hidden">
                                     <div className="flex justify-between items-baseline mb-1">
-                                        <h3 className="font-bold text-gray-900 truncate">{thread.otherUserName}</h3>
+                                        <Link
+                                            to={`/user/${thread.otherUserId}`}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="font-bold text-gray-900 truncate hover:text-blue-600 transition"
+                                        >
+                                            {thread.otherUserName}
+                                        </Link>
                                         {thread.unreadCount > 0 && <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{thread.unreadCount}</span>}
                                     </div>
                                     <p className="text-xs font-bold text-blue-600 truncate mb-0.5">{thread.propertyTitle}</p>

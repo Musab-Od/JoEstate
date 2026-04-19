@@ -12,20 +12,27 @@ import ProfilePage from "./pages/ProfilePage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 import MessagesPage from "./pages/MessagesPage";
 import { WebSocketProvider } from "./context/WebSocketContext";
+import AdminRoute from './components/AdminRoute';
+import AdminLayout from './components/AdminLayout';
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminReports from "./pages/admin/AdminReports";
+import AdminUsers from "./pages/admin/AdminUsers";
 
-// We create an inner component so we can use "useLocation()"
 const AppContent = () => {
     const location = useLocation();
 
-    // Check if the current URL is exactly "/messages"
+    // Check if the current URL is Messages or Admin
     const isMessagesPage = location.pathname === "/messages";
+    const isAdminPage = location.pathname.startsWith("/admin");
 
     return (
-        <div className="flex flex-col min-h-screen">
-            <Header />
+        <div className="flex flex-col min-h-screen bg-gray-50">
+            {/* Hide normal header if we are on the Admin Dashboard */}
+            {!isAdminPage && <Header />}
 
             <main className="flex-grow flex flex-col">
                 <Routes>
+                    {/* PUBLIC ROUTES */}
                     <Route path="/" element={<HomePage />} />
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/user/:userId" element={<PublicProfilePage />} />
@@ -38,11 +45,23 @@ const AppContent = () => {
                     <Route path="/add-property" element={<AddPropertyPage />} />
                     <Route path="/edit-property/:id" element={<AddPropertyPage />} />
                     <Route path="/messages" element={<MessagesPage />} />
+
+                    {/* ADMIN PROTECTED ROUTES */}
+                    <Route element={<AdminRoute />}>
+                        {/* The Layout wraps all admin pages */}
+                        <Route element={<AdminLayout />}>
+                            <Route path="/admin" element={<AdminDashboard />} />
+                            <Route path="/admin/reports" element={<AdminReports />} />
+                            <Route path="/admin/users" element={<AdminUsers />} />
+                            {/* Future routes */}
+                            <Route path="/admin/verifications" element={<div>Verifications Config</div>} />
+                        </Route>
+                    </Route>
                 </Routes>
             </main>
 
-            {/* Fix: Hide the footer if we are on the Messages page! */}
-            {!isMessagesPage && <Footer />}
+            {/* Hide footer if we are on Messages OR Admin pages */}
+            {!isMessagesPage && !isAdminPage && <Footer />}
         </div>
     );
 };
@@ -51,7 +70,7 @@ function App() {
     return (
         <BrowserRouter>
             <WebSocketProvider>
-                    <AppContent />
+                <AppContent />
             </WebSocketProvider>
         </BrowserRouter>
     );

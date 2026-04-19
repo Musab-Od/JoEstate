@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "../api/axios";
-import { MapPin, BedDouble, Bath, Square, Phone, MessageCircle, Heart, Share2, Calendar, X, ChevronLeft, ChevronRight, Grid, User, Trash2, Edit, CheckCircle } from "lucide-react";
+import { MapPin, BedDouble, Bath, Square, Phone, MessageCircle, Heart, Share2, Calendar, X, ChevronLeft, ChevronRight, Grid, User, Trash2, Edit, CheckCircle, Flag, AlertTriangle, ShieldAlert } from "lucide-react";
 
 const PropertyDetailsPage = () => {
     const { id } = useParams();
@@ -14,6 +14,14 @@ const PropertyDetailsPage = () => {
     const [isLiked, setIsLiked] = useState(false);
 
     const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+    // --- REPORT MODAL STATE ---
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [reportReason, setReportReason] = useState("FRAUD");
+    const [reportComment, setReportComment] = useState("");
+    const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+    const [reportSuccess, setReportSuccess] = useState(false);
+    const [reportError, setReportError] = useState("");
+
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
     useEffect(() => {
@@ -144,8 +152,142 @@ const PropertyDetailsPage = () => {
     const isActive = property.status === 'ACTIVE';
     const soldOrRentedText = property.purpose === 'BUY' ? 'SOLD' : 'RENTED';
 
+    const handleReportSubmit = async (e) => {
+        e.preventDefault();
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+            navigate("/login");
+            return;
+        }
+
+        setIsSubmittingReport(true);
+        setReportError(""); // Clear any previous errors
+
+        try {
+            await axios.post(`/reports/property/${id}`, {
+                reason: reportReason,
+                comment: reportComment
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            setReportSuccess(true);
+            setTimeout(() => {
+                setIsReportModalOpen(false);
+                setReportSuccess(false);
+                setReportComment("");
+                setReportError(""); // Reset error on close
+            }, 3000);
+        } catch (err) {
+            console.error(err);
+            // Smart Error Extraction: Pulls the exact message from Spring Boot!
+            let errorMsg = "Failed to submit report. Please try again.";
+            if (err.response && err.response.data) {
+                errorMsg = typeof err.response.data === 'string'
+                    ? err.response.data
+                    : err.response.data.message || errorMsg;
+            }
+            // Set the error to show in the UI instead of an alert()
+            setReportError(errorMsg);
+        } finally {
+            setIsSubmittingReport(false);
+        }
+    };
+
     return (
         <div className="bg-white min-h-screen pb-20 relative">
+
+            {/* --- REPORT MODAL --- */}
+            {isReportModalOpen && (
+                <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+                        {/* Header */}
+                        <div className="bg-red-50 p-6 flex items-start justify-between border-b border-red-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-red-100 rounded-full text-red-600">
+                                    <AlertTriangle className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900">Report Listing</h3>
+                                    <p className="text-sm text-red-600 font-medium">Our Trust & Safety team will review this.</p>
+                                </div>
+                            </div>
+                            <button onClick={() => {
+                                setReportError("");
+                                setIsReportModalOpen(false);
+                            }}
+                                    className="text-gray-400 hover:text-gray-600 transition">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        {reportSuccess ? (
+                            <div className="p-8 text-center space-y-3">
+                                <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <CheckCircle className="w-8 h-8" />
+                                </div>
+                                <h4 className="text-xl font-bold text-gray-900">Report Submitted</h4>
+                                <p className="text-gray-500 font-medium">Thank you for keeping JoEstate safe. We will investigate this property immediately.</p>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleReportSubmit} className="p-6 space-y-5">
+                                {reportError && (
+                                    <div className="bg-red-50 text-red-700 text-sm font-bold p-3 rounded-xl border border-red-100 flex items-start gap-2 animate-in slide-in-from-top-2">
+                                        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                                        <span>{reportError}</span>
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Reason for reporting</label>
+                                    <select
+                                        value={reportReason}
+                                        onChange={(e) => setReportReason(e.target.value)}
+                                        className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 font-medium outline-none"
+                                    >
+                                        <option value="FRAUD">Scam or Fraudulent Listing</option>
+                                        <option value="INACCURATE">Inaccurate Information/Photos</option>
+                                        <option value="INAPPROPRIATE">Inappropriate Content</option>
+                                        <option value="SOLD_UNAVAILABLE">Property is already Sold/Rented</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Additional Comments (Optional)</label>
+                                    <textarea
+                                        rows="3"
+                                        value={reportComment}
+                                        onChange={(e) => setReportComment(e.target.value)}
+                                        placeholder="Please provide any extra details to help our team..."
+                                        className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 font-medium outline-none resize-none"
+                                    ></textarea>
+                                </div>
+
+                                <div className="flex gap-3 pt-4 border-t border-gray-100">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setReportError("");
+                                            setIsReportModalOpen(false);
+                                        }}
+                                        className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isSubmittingReport}
+                                        className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center"
+                                    >
+                                        {isSubmittingReport ? "Sending..." : "Submit Report"}
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {isGalleryOpen && (
                 <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center backdrop-blur-sm animate-in fade-in duration-200">
@@ -246,20 +388,38 @@ const PropertyDetailsPage = () => {
                         {currentUser && currentUser.userId === property.ownerId ? (
                             /* --- I AM THE OWNER --- */
                             <div className="space-y-3">
-                                <div className="bg-blue-50 text-blue-700 text-sm font-bold px-4 py-3 rounded-xl mb-4 text-center border border-blue-100">
-                                    This is your property listing.
-                                </div>
 
-                                {isActive ? (
-                                    <button onClick={() => handleStatusChange(soldOrRentedText)} className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-200">
-                                        <CheckCircle className="w-5 h-5" /> Mark as {soldOrRentedText}
-                                    </button>
+                                {/* 1. DYNAMIC WARNING BANNER */}
+                                {property.status === 'SUSPENDED' ? (
+                                    <div className="bg-orange-50 text-orange-800 text-sm px-5 py-4 rounded-xl mb-4 border border-orange-200 flex items-start gap-3">
+                                        <ShieldAlert className="w-6 h-6 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-bold mb-1">Listing Temporarily Hidden</p>
+                                            <p className="font-medium text-orange-700 leading-relaxed">
+                                                Your property is currently under review by our Trust & Safety team and is hidden from the public. If you have updated your listing or believe this is an error, please reach out via the <span className="font-bold underline cursor-pointer">Support Page</span>.
+                                            </p>
+                                        </div>
+                                    </div>
                                 ) : (
-                                    <button onClick={() => handleStatusChange('ACTIVE')} className="w-full py-4 bg-gray-800 hover:bg-gray-900 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all">
-                                        Re-list as Active
-                                    </button>
+                                    <div className="bg-blue-50 text-blue-700 text-sm font-bold px-4 py-3 rounded-xl mb-4 text-center border border-blue-100">
+                                        This is your property listing.
+                                    </div>
                                 )}
 
+                                {/* 2. THE RESTORED STATUS BUTTONS (Hidden if Suspended) */}
+                                {property.status !== 'SUSPENDED' && (
+                                    isActive ? (
+                                        <button onClick={() => handleStatusChange(soldOrRentedText)} className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-200">
+                                            <CheckCircle className="w-5 h-5" /> Mark as {soldOrRentedText}
+                                        </button>
+                                    ) : (
+                                        <button onClick={() => handleStatusChange('ACTIVE')} className="w-full py-4 bg-gray-800 hover:bg-gray-900 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all">
+                                            Re-list as Active
+                                        </button>
+                                    )
+                                )}
+
+                                {/* 3. EDIT / DELETE BUTTONS */}
                                 <div className="grid grid-cols-2 gap-3 pt-2">
                                     <button onClick={handleEdit} className="w-full py-3 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold rounded-xl flex items-center justify-center gap-2 transition-all border border-blue-100">
                                         <Edit className="w-4 h-4" /> Edit
@@ -294,7 +454,20 @@ const PropertyDetailsPage = () => {
                                 <Share2 className="w-4 h-4" /> Share this property
                             </button>
                         </div>
-
+                        {/* Only show Report button to visitors, not the owner */}
+                        {!(currentUser && currentUser.userId === property.ownerId) && (
+                            <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+                                <button
+                                    onClick={() => {
+                                        if(!localStorage.getItem("token")) { navigate("/login"); return; }
+                                        setIsReportModalOpen(true);
+                                    }}
+                                    className="text-xs font-bold text-gray-400 hover:text-red-600 flex items-center justify-center gap-1 w-full transition-colors"
+                                >
+                                    <Flag className="w-3 h-3" /> Report this listing
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 

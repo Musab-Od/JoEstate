@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import axios from "../api/axios";
 import { User, Phone, MapPin } from "lucide-react";
 import SearchResultCard from "../components/SearchResultCard";
 
+
 const PublicProfilePage = () => {
     const { userId } = useParams();
+    const navigate = useNavigate();
     const [profile, setProfile] = useState(null);
     const [properties, setProperties] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -37,6 +39,26 @@ const PublicProfilePage = () => {
         };
         fetchData();
     }, [userId]);
+    useEffect(() => {
+        // Teleport the user to their private dashboard if they try to view their own public link
+        const checkIdentity = async () => {
+            const token = localStorage.getItem("token");
+            if (token && userId) {
+                try {
+                    const res = await axios.get("/users/me", {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    // If the logged-in ID matches the URL ID, teleport them!
+                    if (res.data.userId.toString() === userId.toString()) {
+                        navigate("/profile", { replace: true });
+                    }
+                } catch(e) {
+                    // Token invalid or expired, do nothing
+                }
+            }
+        };
+        checkIdentity();
+    }, [userId, navigate]);
 
     if (loading) return <div className="text-center py-20 text-blue-600 font-bold">Loading Agent Profile...</div>;
     if (!profile) return <div className="text-center py-20 text-red-500 font-bold">User not found.</div>;
