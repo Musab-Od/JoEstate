@@ -68,6 +68,7 @@ public class PropertyService {
         // For simplicity, we just return the basic DTOs.
         return propertyRepository.findAllByOwner_UserId(userId)
                 .stream()
+                .filter(p -> p.getStatus() != Property.Status.SUSPENDED)
                 .map(p -> mapToDTO(p, Collections.emptySet()))
                 .collect(Collectors.toList());
     }

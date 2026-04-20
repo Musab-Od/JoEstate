@@ -19,6 +19,10 @@ public class UserDTO {
     private String phoneNumber;
     private String bio;
     private String profilePictureUrl;
+    private String role;
+    private boolean isVerified;
+    private boolean isBanned;
+    private java.time.LocalDateTime createdAt;
 
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) // Allows sending to server, but hides from response
     @Size(min = 6, message = "New password must be at least 6 characters")

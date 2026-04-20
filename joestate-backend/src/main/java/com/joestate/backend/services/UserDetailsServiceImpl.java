@@ -19,7 +19,12 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         com.joestate.backend.entities.User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User Not Found with email: " + email));
 
-        // 2. Convert to Spring Security User
+        // 2. THE BAN CHECK: Slam the door if they are banned!
+        if (user.isBanned()) {
+            throw new org.springframework.security.authentication.LockedException("This account has been permanently banned by an Administrator.");
+        }
+
+        // 3. Convert to Spring Security User
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getEmail())
                 .password(user.getPasswordHash())

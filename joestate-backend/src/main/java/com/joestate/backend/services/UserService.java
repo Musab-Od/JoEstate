@@ -124,6 +124,9 @@ public class UserService {
                 .phoneNumber(u.getPhoneNumber())
                 .bio(u.getBio())
                 .profilePictureUrl(u.getProfilePictureUrl())
+                .role(u.getRole().name())
+                .isVerified(u.isVerified())
+                .isBanned(u.isBanned())
                 .build();
     }
 }

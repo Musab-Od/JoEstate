@@ -43,4 +43,16 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
     List<Property> findAllByOwner_Email(String email); // Finds all houses owned by this user
 
     List<Property> findAllByOwner_UserId(Long userId);
+
+    // For the KPI Dashboard
+    long countByStatus(Property.Status status);
+
+    // For the Hot List
+    List<Property> findTop5ByOrderByDatePostedDesc();
+
+    // Advanced Filtering: Find all suspended properties
+    List<Property> findByStatusOrderByDatePostedDesc(Property.Status status);
+
+    // Advanced Filtering: Sort by Price Ascending (To catch "Villa for 5 JOD" scams)
+    List<Property> findAllByOrderByPriceAsc();
 }

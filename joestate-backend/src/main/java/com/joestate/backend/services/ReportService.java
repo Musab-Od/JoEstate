@@ -19,6 +19,10 @@ public class ReportService {
 
     public Report createReport(String reporterEmail, Long propertyId, Report.Reason reason, String comment) {
 
+        if (reportRepository.existsByReporter_EmailAndProperty_PropertyIdAndReason(reporterEmail, propertyId, reason)) {
+            throw new RuntimeException("You have already reported this property for this specific reason.");
+        }
+
         // 1. Safely find the user by their JWT email
         User reporter = userRepository.findByEmail(reporterEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
