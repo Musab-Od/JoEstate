@@ -37,11 +37,21 @@ public class ChatService {
             throw new RuntimeException("You cannot message yourself!");
         }
 
+        // 1. Find the person trying to send the message
+        User inquirer = userRepository.findByEmail(inquirerEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // 2. Check if the SENDER is muted from messaging
+        if (inquirer.getBanStatus() == User.BanStatus.MUTE_MESSAGES ||
+                inquirer.getBanStatus() == User.BanStatus.MUTE_BOTH ||
+                inquirer.getBanStatus() == User.BanStatus.BANNED) {
+            throw new RuntimeException("Your account has been restricted from messaging other users.");
+        }
+
         // Return existing thread if it exists, otherwise create a new one!
         return threadRepository.findByProperty_PropertyIdAndInquirer_Email(propertyId, inquirerEmail)
                 .map(ChatThread::getThreadId)
                 .orElseGet(() -> {
-                    User inquirer = userRepository.findByEmail(inquirerEmail).orElseThrow();
                     ChatThread newThread = ChatThread.builder()
                             .property(property)
                             .inquirer(inquirer)

@@ -15,33 +15,36 @@ public class ReportController {
 
     private final ReportService reportService;
 
-    // A clean static class to map the incoming JSON (No reporterId needed!)
     public static class ReportRequest {
         public Report.Reason reason;
         public String comment;
     }
 
     @PostMapping("/property/{propertyId}")
-    public ResponseEntity<?> submitReport(
-            @PathVariable Long propertyId,
-            @RequestBody ReportRequest request) {
-
+    public ResponseEntity<?> submitPropertyReport(@PathVariable Long propertyId, @RequestBody ReportRequest request) {
         try {
-            // 1. Safely extract the logged-in user's email from the Security Context (JWT)
             String reporterEmail = SecurityContextHolder.getContext().getAuthentication().getName();
 
-            // 2. Pass it to the service
-            Report newReport = reportService.createReport(
-                    reporterEmail,
-                    propertyId,
-                    request.reason,
-                    request.comment
-            );
+            // We call the service to execute the logic, but we don't need to store the result
+            reportService.createPropertyReport(reporterEmail, propertyId, request.reason, request.comment);
 
-            return ResponseEntity.ok("Report submitted successfully! Report ID: " + newReport.getReportId());
-
+            return ResponseEntity.ok("Property report submitted successfully.");
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error occurred: " + e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/user/{reportedUserId}")
+    public ResponseEntity<?> submitUserReport(@PathVariable Long reportedUserId, @RequestBody ReportRequest request) {
+        try {
+            String reporterEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+
+            // Execute logic without storing the unused 'newReport' object
+            reportService.createUserReport(reporterEmail, reportedUserId, request.reason, request.comment);
+
+            return ResponseEntity.ok("User report submitted successfully.");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 }

@@ -20,7 +20,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Boolean existsByEmail(String email);
 
     // For the KPI Dashboard
-    long countByIsBannedTrue();
+    long countByBanStatus(User.BanStatus banStatus);
 
     // For the Hot List
     List<User> findTop5ByOrderByCreatedAtDesc();

@@ -3,7 +3,7 @@ import { useLocation, useNavigate, Link } from "react-router-dom";
 import axios from "../api/axios";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client/dist/sockjs";
-import { Send, Image as ImageIcon, Info, User } from "lucide-react";
+import { Send, Image as ImageIcon, Info, User, ShieldAlert } from "lucide-react";
 import { useWebSocket } from "../context/WebSocketContext"
 
 const MessagesPage = () => {
@@ -19,8 +19,8 @@ const MessagesPage = () => {
     const [newMessage, setNewMessage] = useState("");
     const [stompClient, setStompClient] = useState(null);
     const [myEmail, setMyEmail] = useState("");
+    const [currentUser, setCurrentUser] = useState(null);
 
-    const messagesEndRef = useRef(null);
     const chatContainerRef = useRef(null);
 
     // 1. Fetch User Email and Inbox on Mount
@@ -33,6 +33,7 @@ const MessagesPage = () => {
                 // Get my info
                 const userRes = await axios.get("/users/me", { headers: { Authorization: `Bearer ${token}` } });
                 setMyEmail(userRes.data.email);
+                setCurrentUser(userRes.data);
 
                 // Get my inbox
                 const inboxRes = await axios.get("/chat/inbox", { headers: { Authorization: `Bearer ${token}` } });
@@ -232,11 +233,16 @@ const MessagesPage = () => {
                             })}
                         </div>
 
-                        {/* Chat Footer: Input Field (With Off-Market Logic) */}
+                        {/* Chat Footer: Input Field (With Multi-Tier Logic) */}
                         <div className="bg-white p-4 border-t border-gray-200">
-                            {activeThread.propertyStatus !== 'ACTIVE' ? (
+                            {currentUser && (currentUser.banStatus === 'MUTE_MESSAGES' || currentUser.banStatus === 'BANNED' || currentUser.banStatus === 'MUTE_BOTH') ? (
+                                <div className="bg-red-50 text-red-600 p-3 rounded-xl text-center font-bold text-sm border border-red-200 flex flex-col items-center justify-center">
+                                    <ShieldAlert className="w-5 h-5 mb-1" />
+                                    Your account is restricted from sending messages.
+                                </div>
+                            ) : activeThread.propertyStatus !== 'ACTIVE' ? (
                                 <div className="bg-gray-100 text-gray-500 p-3 rounded-xl text-center font-medium text-sm border border-gray-200 flex items-center justify-center gap-2">
-                                    <Info className="w-4 h-4" /> This property is currently marked as {activeThread.propertyStatus}. Messages are disabled.
+                                    <Info className="w-4 h-4" /> This property is currently {activeThread.propertyStatus.toLowerCase()}. Messages are disabled.
                                 </div>
                             ) : (
                                 <form onSubmit={handleSendMessage} className="flex gap-2 relative">

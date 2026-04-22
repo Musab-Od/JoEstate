@@ -137,6 +137,12 @@ public class PropertyService {
         User owner = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        if (owner.getBanStatus() == User.BanStatus.MUTE_PUBLISHING ||
+                owner.getBanStatus() == User.BanStatus.MUTE_BOTH ||
+                owner.getBanStatus() == User.BanStatus.BANNED) {
+            throw new RuntimeException("Your account has been restricted from publishing new properties.");
+        }
+
         Property property = new Property();
         property.setOwner(owner);
         property.setTitle(dto.getTitle());

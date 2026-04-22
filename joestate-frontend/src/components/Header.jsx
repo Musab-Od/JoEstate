@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "../api/axios";
-import { User, LogOut, Menu, PlusCircle, Building2, ChevronDown, LayoutDashboard, Bell, MessageCircle, Heart, MessageSquare } from "lucide-react";
+import { User, LogOut, Menu, PlusCircle, Building2, ChevronDown, LayoutDashboard, Bell, MessageCircle, Heart, MessageSquare, ShieldAlert } from "lucide-react";
 import { useWebSocket } from "../context/WebSocketContext";
 
 const Header = () => {
@@ -23,6 +23,9 @@ const Header = () => {
     const dropdownRef = useRef(null);
     const notifRef = useRef(null);
 
+    // Ban State
+    const [banStatus, setBanStatus] = useState("NONE");
+
     // 1. Load User Data & Fetch Notifications
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -36,6 +39,7 @@ const Header = () => {
             axios.get("/users/me", { headers: { Authorization: `Bearer ${token}` } })
                 .then(res => {
                     setUserName(res.data.firstName);
+                    setBanStatus(res.data.banStatus);
                     if (res.data.profilePictureUrl) {
                         setAvatarUrl(`http://localhost:8080/uploads/${res.data.profilePictureUrl}`);
                     }
@@ -214,13 +218,18 @@ const Header = () => {
                     )}
 
                     {/* Add Property Button */}
-                    <button
-                        onClick={handleAddPropertyClick}
-                        className="hidden md:flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-5 py-2.5 rounded-full hover:shadow-lg hover:shadow-blue-200 transition text-sm font-bold transform hover:-translate-y-0.5"
-                    >
-                        <PlusCircle className="w-4 h-4" />
-                        Add Property
-                    </button>
+                    {banStatus === 'MUTE_PUBLISHING' || banStatus === 'BANNED' || banStatus === 'MUTE_BOTH' ? (
+                        <button disabled className="hidden md:flex items-center gap-2 bg-gray-200 text-gray-500 px-5 py-2.5 rounded-full text-sm font-bold cursor-not-allowed border border-gray-300">
+                            <ShieldAlert className="w-4 h-4" /> Publishing Restricted
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleAddPropertyClick}
+                            className="hidden md:flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-5 py-2.5 rounded-full hover:shadow-lg hover:shadow-blue-200 transition text-sm font-bold transform hover:-translate-y-0.5"
+                        >
+                            <PlusCircle className="w-4 h-4" /> Add Property
+                        </button>
+                    )}
 
                     {/* USER LOGIC */}
                     {isLoggedIn ? (
@@ -268,9 +277,15 @@ const Header = () => {
                     <Link to="/about" className="block text-gray-700 font-medium">About</Link>
                     <Link to="/contact" className="block text-gray-700 font-medium">Contact</Link>
                     <div className="border-t pt-3">
-                        <button onClick={handleAddPropertyClick} className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg font-bold">
-                            <PlusCircle className="w-4 h-4" /> Add Property
-                        </button>
+                        {banStatus === 'MUTE_PUBLISHING' || banStatus === 'BANNED' ? (
+                            <button disabled className="w-full flex items-center justify-center gap-2 bg-gray-200 text-gray-500 py-2 rounded-lg font-bold cursor-not-allowed">
+                                <ShieldAlert className="w-4 h-4" /> Publishing Restricted
+                            </button>
+                        ) : (
+                            <button onClick={handleAddPropertyClick} className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg font-bold">
+                                <PlusCircle className="w-4 h-4" /> Add Property
+                            </button>
+                        )}
                     </div>
                 </div>
             )}

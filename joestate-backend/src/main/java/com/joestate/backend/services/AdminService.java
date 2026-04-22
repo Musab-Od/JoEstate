@@ -22,69 +22,56 @@ public class AdminService {
     private final ReportRepository reportRepository;
     private final VerificationRequestRepository verificationRequestRepository;
 
-    @Transactional
-    public void banUserAndSuspendProperties(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        user.setBanned(true);
-        userRepository.save(user);
+    // ==========================================
+    // 1. DASHBOARD & TELEMETRY
+    // ==========================================
 
-        List<Property> userProperties = propertyRepository.findAllByOwner_UserId(userId);
-        for (Property property : userProperties) {
-            property.setStatus(Property.Status.SUSPENDED);
-        }
-        propertyRepository.saveAll(userProperties);
-    }
-
-    @Transactional
-    public void resolveReport(Long reportId, String action) {
-        Report report = reportRepository.findById(reportId)
-                .orElseThrow(() -> new RuntimeException("Report not found"));
-
-        Property property = report.getProperty();
-        User scammer = property.getOwner();
-
-        switch (action.toUpperCase()) {
-            case "DISMISS":
-                report.setStatus(Report.ReportStatus.RESOLVED_DISMISSED);
-                break;
-
-            case "DELETE_PROPERTY":
-                report.setStatus(Report.ReportStatus.RESOLVED_DELETED);
-                property.setStatus(Property.Status.SUSPENDED);
-                propertyRepository.save(property);
-                break;
-
-            case "BAN_USER":
-                report.setStatus(Report.ReportStatus.RESOLVED_BANNED);
-                banUserAndSuspendProperties(scammer.getUserId()); // Drop the ban hammer!
-                break;
-
-            default:
-                throw new RuntimeException("Invalid admin action");
-        }
-
-        reportRepository.save(report);
-    }
-    // 1. Fetch Platform Analytics (KPIs)
     public java.util.Map<String, Long> getPlatformKPIs() {
         java.util.Map<String, Long> kpis = new java.util.HashMap<>();
         kpis.put("totalUsers", userRepository.count());
-        kpis.put("bannedUsers", userRepository.countByIsBannedTrue());
+        kpis.put("bannedUsers", userRepository.countByBanStatus(User.BanStatus.BANNED));
         kpis.put("activeProperties", propertyRepository.countByStatus(Property.Status.ACTIVE));
         kpis.put("suspendedProperties", propertyRepository.countByStatus(Property.Status.SUSPENDED));
         kpis.put("pendingReports", reportRepository.countByStatus(Report.ReportStatus.PENDING));
         kpis.put("resolvedReports", reportRepository.count() - reportRepository.countByStatus(Report.ReportStatus.PENDING));
-
-        // ADD THIS ONE LINE:
         kpis.put("pendingVerifications", verificationRequestRepository.countByStatus(com.joestate.backend.entities.VerificationRequest.RequestStatus.PENDING));
         return kpis;
     }
 
-    // 2. The Master Global User Search
+    public List<java.util.Map<String, Object>> getRecentActivity() {
+        List<java.util.Map<String, Object>> activities = new java.util.ArrayList<>();
+
+        for (User u : userRepository.findTop5ByOrderByCreatedAtDesc()) {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("type", "USER_JOINED");
+            map.put("message", "User '" + u.getFirstName() + " " + u.getLastName() + "' joined the platform.");
+            map.put("timestamp", u.getCreatedAt());
+            activities.add(map);
+        }
+
+        for (Report r : reportRepository.findTop5ByOrderByCreatedAtDesc()) {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("type", "REPORT_FILED");
+            String reporterName = r.getReporter().getFirstName() + " " + r.getReporter().getLastName();
+            if (r.getType() == Report.ReportType.PROPERTY) {
+                map.put("message", reporterName + " reported Property '" + r.getProperty().getTitle() + "' for " + r.getReason().name() + ".");
+            } else {
+                map.put("message", reporterName + " reported User '" + r.getReportedUser().getFirstName() + " " + r.getReportedUser().getLastName() + "' for " + r.getReason().name() + ".");
+            }
+            map.put("timestamp", r.getCreatedAt());
+            activities.add(map);
+        }
+
+        activities.sort((a, b) -> ((java.time.LocalDateTime) b.get("timestamp")).compareTo((java.time.LocalDateTime) a.get("timestamp")));
+        return activities.size() > 6 ? activities.subList(0, 6) : activities;
+    }
+
+    // ==========================================
+    // 2. USER MANAGEMENT & AUDITING
+    // ==========================================
+
     public List<com.joestate.backend.dto.UserDTO> searchUsers(String searchTerm) {
-        return userRepository.searchUsersGlobally(searchTerm)
-                .stream()
+        return userRepository.searchUsersGlobally(searchTerm).stream()
                 .map(user -> com.joestate.backend.dto.UserDTO.builder()
                         .userId(user.getUserId())
                         .firstName(user.getFirstName())
@@ -92,69 +79,49 @@ public class AdminService {
                         .email(user.getEmail())
                         .phoneNumber(user.getPhoneNumber())
                         .role(user.getRole().name())
-                        .isBanned(user.isBanned())
+                        .banStatus(user.getBanStatus().name())
                         .isVerified(user.isVerified())
                         .createdAt(user.getCreatedAt())
                         .build())
                 .collect(java.util.stream.Collectors.toList());
     }
 
-    // 3. Fetch Pending Verification Requests
-    public List<com.joestate.backend.dto.VerificationRequestDTO> getPendingVerifications() {
-        return verificationRequestRepository.findByStatus(com.joestate.backend.entities.VerificationRequest.RequestStatus.PENDING)
-                .stream()
-                .map(v -> com.joestate.backend.dto.VerificationRequestDTO.builder()
-                        .requestId(v.getRequestId())
-                        .userId(v.getUser().getUserId())
-                        .userEmail(v.getUser().getEmail())
-                        .userFullName(v.getUser().getFirstName() + " " + v.getUser().getLastName())
-                        .documentUrl(v.getDocumentUrl())
-                        .status(v.getStatus())
-                        .submittedAt(v.getSubmittedAt())
-                        .build())
-                .collect(java.util.stream.Collectors.toList());
+    public List<com.joestate.backend.dto.ReportDTO> getUserReportHistory(Long userId) {
+        return reportRepository.findByReporter_UserIdOrReportedUser_UserId(userId, userId)
+                .stream().map(this::mapReportToDTO).collect(java.util.stream.Collectors.toList());
     }
 
-    // 4. Resolve Verification Request (Approve or Reject)
     @Transactional
-    public void resolveVerification(Long requestId, String action) {
-        com.joestate.backend.entities.VerificationRequest request = verificationRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
+    public void updateUserBanStatusWithAudit(Long userId, com.joestate.backend.entities.User.BanStatus newStatus, String notes, String adminEmail) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        User admin = userRepository.findByEmail(adminEmail).orElseThrow(() -> new RuntimeException("Admin not found"));
 
-        if ("APPROVE".equalsIgnoreCase(action)) {
-            request.setStatus(com.joestate.backend.entities.VerificationRequest.RequestStatus.APPROVED);
-            // Give the user the blue checkmark!
-            User user = request.getUser();
-            user.setVerified(true);
-            userRepository.save(user);
-        } else if ("REJECT".equalsIgnoreCase(action)) {
-            request.setStatus(com.joestate.backend.entities.VerificationRequest.RequestStatus.REJECTED);
-        } else {
-            throw new RuntimeException("Invalid action. Use APPROVE or REJECT.");
-        }
+        user.setBanStatus(newStatus);
 
-        verificationRequestRepository.save(request);
-    }
-    @Transactional
-    public void toggleUserBan(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // Flip the ban status
-        user.setBanned(!user.isBanned());
-
-        // If we just banned them, suspend all their properties instantly
-        if (user.isBanned()) {
+        if (newStatus == com.joestate.backend.entities.User.BanStatus.BANNED) {
             List<Property> userProperties = propertyRepository.findAllByOwner_UserId(userId);
-            for (Property property : userProperties) {
-                property.setStatus(Property.Status.SUSPENDED);
-            }
+            for (Property p : userProperties) p.setStatus(Property.Status.SUSPENDED);
             propertyRepository.saveAll(userProperties);
         }
-
         userRepository.save(user);
+
+        Report auditLog = new Report();
+        auditLog.setType(Report.ReportType.USER);
+        auditLog.setReportedUser(user);
+        auditLog.setReporter(admin);
+        auditLog.setAssignedAdmin(admin);
+        auditLog.setReason(Report.Reason.INAPPROPRIATE);
+        auditLog.setComment("MANUAL SYSTEM OVERRIDE");
+        auditLog.setAdminNotes(notes + " (Action: " + newStatus.name() + ")");
+        auditLog.setStatus(Report.ReportStatus.RESOLVED_BANNED);
+
+        reportRepository.save(auditLog);
     }
-    // Fetch all properties for admin accordion
+
+    // ==========================================
+    // 3. PROPERTY MANAGEMENT
+    // ==========================================
+
     public List<com.joestate.backend.dto.PropertyDTO> getUserPropertiesForAdmin(Long userId) {
         return propertyRepository.findAllByOwner_UserId(userId).stream()
                 .map(p -> com.joestate.backend.dto.PropertyDTO.builder()
@@ -168,7 +135,20 @@ public class AdminService {
                 .collect(java.util.stream.Collectors.toList());
     }
 
-    // Individual Property Suspend Toggle
+    public List<com.joestate.backend.dto.PropertyDTO> getSuspendedPropertiesArchive() {
+        return propertyRepository.findByStatusOrderByDatePostedDesc(com.joestate.backend.entities.Property.Status.SUSPENDED).stream()
+                .map(p -> com.joestate.backend.dto.PropertyDTO.builder()
+                        .propertyId(p.getPropertyId())
+                        .title(p.getTitle())
+                        .status(p.getStatus())
+                        .price(p.getPrice())
+                        .location(p.getLocation())
+                        .datePosted(p.getDatePosted())
+                        .ownerName(p.getOwner().getFirstName() + " " + p.getOwner().getLastName())
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     @Transactional
     public void togglePropertySuspension(Long propertyId) {
         com.joestate.backend.entities.Property property = propertyRepository.findById(propertyId)
@@ -182,69 +162,170 @@ public class AdminService {
         propertyRepository.save(property);
     }
 
-    // Fetch Resolved Reports
+    // ==========================================
+    // 4. ZENDESK-STYLE MODERATION QUEUE
+    // ==========================================
+
+    public List<com.joestate.backend.dto.ReportDTO> getGlobalQueue() {
+        return reportRepository.findByStatusAndAssignedAdminIsNull(Report.ReportStatus.PENDING)
+                .stream().map(this::mapReportToDTO).collect(java.util.stream.Collectors.toList());
+    }
+
+    public List<com.joestate.backend.dto.ReportDTO> getMyWorkspace(String adminEmail) {
+        return reportRepository.findByStatusAndAssignedAdmin_Email(Report.ReportStatus.PENDING, adminEmail)
+                .stream().map(this::mapReportToDTO).collect(java.util.stream.Collectors.toList());
+    }
+
     public List<com.joestate.backend.dto.ReportDTO> getResolvedReports() {
-        // Assuming your enum has RESOLVED statuses. Adjust if your naming is slightly different!
         return reportRepository.findAll().stream()
                 .filter(r -> r.getStatus() != com.joestate.backend.entities.Report.ReportStatus.PENDING)
-                .map(this::mapReportToDTO) // using the mapper you already have
+                .map(this::mapReportToDTO)
                 .collect(java.util.stream.Collectors.toList());
     }
 
-    // Fetch the Suspended Archive
-    public List<com.joestate.backend.dto.PropertyDTO> getSuspendedPropertiesArchive() {
-        return propertyRepository.findByStatusOrderByDatePostedDesc(com.joestate.backend.entities.Property.Status.SUSPENDED)
-                .stream()
-                .map(p -> com.joestate.backend.dto.PropertyDTO.builder()
-                        .propertyId(p.getPropertyId())
-                        .title(p.getTitle())
-                        .status(p.getStatus())
-                        .price(p.getPrice())
-                        .location(p.getLocation())
-                        .datePosted(p.getDatePosted())
-                        .ownerName(p.getOwner().getFirstName() + " " + p.getOwner().getLastName())
+    @Transactional
+    public void claimReport(Long reportId, String adminEmail) {
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new RuntimeException("Report not found"));
+
+        if (report.getStatus() != Report.ReportStatus.PENDING) {
+            throw new RuntimeException("This report has already been resolved.");
+        }
+
+        if (report.getAssignedAdmin() != null) {
+            if (report.getAssignedAdmin().getEmail().equals(adminEmail)) return;
+            throw new RuntimeException("Race Condition: This report was just claimed by another administrator.");
+        }
+
+        User admin = userRepository.findByEmail(adminEmail).orElseThrow(() -> new RuntimeException("Admin not found"));
+        report.setAssignedAdmin(admin);
+        reportRepository.save(report);
+    }
+
+    @Transactional
+    public void resolveReport(Long reportId, String action, String notes, String adminEmail) {
+        Report report = reportRepository.findById(reportId).orElseThrow(() -> new RuntimeException("Report not found"));
+
+        if (report.getStatus() != Report.ReportStatus.PENDING) {
+            throw new RuntimeException("This report was already resolved.");
+        }
+
+        if (report.getAssignedAdmin() == null || !report.getAssignedAdmin().getEmail().equals(adminEmail)) {
+            throw new RuntimeException("You must claim this report before resolving it.");
+        }
+
+        report.setAdminNotes(notes);
+
+        User scammer;
+        Property property = null;
+
+        if (report.getType() == Report.ReportType.PROPERTY) {
+            property = report.getProperty();
+            scammer = property.getOwner();
+        } else {
+            scammer = report.getReportedUser();
+        }
+
+        switch (action.toUpperCase()) {
+            case "DISMISS":
+                report.setStatus(Report.ReportStatus.RESOLVED_DISMISSED);
+                break;
+            case "DELETE_PROPERTY":
+                if (report.getType() == Report.ReportType.PROPERTY && property != null) {
+                    report.setStatus(Report.ReportStatus.RESOLVED_DELETED);
+                    property.setStatus(Property.Status.SUSPENDED);
+                    propertyRepository.save(property);
+                } else {
+                    throw new RuntimeException("Cannot delete property on a User-type report.");
+                }
+                break;
+            case "MUTE_MESSAGES":
+                report.setStatus(Report.ReportStatus.RESOLVED_BANNED);
+                updateUserBanStatusWithAudit(scammer.getUserId(), User.BanStatus.MUTE_MESSAGES, notes, adminEmail);
+                break;
+            case "MUTE_PUBLISHING":
+                report.setStatus(Report.ReportStatus.RESOLVED_BANNED);
+                updateUserBanStatusWithAudit(scammer.getUserId(), User.BanStatus.MUTE_PUBLISHING, notes, adminEmail);
+                break;
+            case "MUTE_BOTH":
+                report.setStatus(Report.ReportStatus.RESOLVED_BANNED);
+                updateUserBanStatusWithAudit(scammer.getUserId(), User.BanStatus.MUTE_BOTH, notes, adminEmail);
+                break;
+            case "BAN_USER":
+                report.setStatus(Report.ReportStatus.RESOLVED_BANNED);
+                updateUserBanStatusWithAudit(scammer.getUserId(), User.BanStatus.BANNED, notes, adminEmail);
+                break;
+            default:
+                throw new RuntimeException("Invalid admin action");
+        }
+
+        reportRepository.save(report);
+    }
+
+    // ==========================================
+    // 5. ENTERPRISE VERIFICATION
+    // ==========================================
+
+    public List<com.joestate.backend.dto.VerificationRequestDTO> getPendingVerifications() {
+        return verificationRequestRepository.findByStatus(com.joestate.backend.entities.VerificationRequest.RequestStatus.PENDING).stream()
+                .map(v -> com.joestate.backend.dto.VerificationRequestDTO.builder()
+                        .requestId(v.getRequestId())
+                        .userId(v.getUser().getUserId())
+                        .userEmail(v.getUser().getEmail())
+                        .userFullName(v.getUser().getFirstName() + " " + v.getUser().getLastName())
+                        .documentUrl(v.getDocumentUrl())
+                        .status(v.getStatus())
+                        .submittedAt(v.getSubmittedAt())
                         .build())
                 .collect(java.util.stream.Collectors.toList());
     }
-    // Helper: Map Report Entity to DTO for the Moderation Queue
-    private com.joestate.backend.dto.ReportDTO mapReportToDTO(com.joestate.backend.entities.Report report) {
-        return com.joestate.backend.dto.ReportDTO.builder()
-                .reportId(report.getReportId())
-                .propertyId(report.getProperty().getPropertyId())
-                .propertyTitle(report.getProperty().getTitle())
-                .reporterName(report.getReporter().getFirstName() + " " + report.getReporter().getLastName())
-                .reporterEmail(report.getReporter().getEmail())
-                .reason(report.getReason()) // <--- Fixed: Removed .name()
-                .comment(report.getComment())
-                .status(report.getStatus()) // <--- Fixed: Removed .name()
-                .createdAt(report.getCreatedAt())
-                .build();
+
+    @Transactional
+    public void resolveVerification(Long requestId, String action) {
+        com.joestate.backend.entities.VerificationRequest request = verificationRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Request not found"));
+
+        if ("APPROVE".equalsIgnoreCase(action)) {
+            request.setStatus(com.joestate.backend.entities.VerificationRequest.RequestStatus.APPROVED);
+            User user = request.getUser();
+            user.setVerified(true);
+            userRepository.save(user);
+        } else if ("REJECT".equalsIgnoreCase(action)) {
+            request.setStatus(com.joestate.backend.entities.VerificationRequest.RequestStatus.REJECTED);
+        } else {
+            throw new RuntimeException("Invalid action. Use APPROVE or REJECT.");
+        }
+        verificationRequestRepository.save(request);
     }
-    public List<java.util.Map<String, Object>> getRecentActivity() {
-        List<java.util.Map<String, Object>> activities = new java.util.ArrayList<>();
 
-        // 1. Get recent users
-        for (User u : userRepository.findTop5ByOrderByCreatedAtDesc()) {
-            java.util.Map<String, Object> map = new java.util.HashMap<>();
-            map.put("type", "USER_JOINED");
-            map.put("message", "User '" + u.getFirstName() + " " + u.getLastName() + "' joined the platform.");
-            map.put("timestamp", u.getCreatedAt());
-            activities.add(map);
+    // ==========================================
+    // HELPER METHODS
+    // ==========================================
+
+    private com.joestate.backend.dto.ReportDTO mapReportToDTO(com.joestate.backend.entities.Report r) {
+        var builder = com.joestate.backend.dto.ReportDTO.builder()
+                .reportId(r.getReportId())
+                .type(r.getType())
+                .reason(r.getReason())
+                .comment(r.getComment())
+                .status(r.getStatus())
+                .createdAt(r.getCreatedAt())
+                .reporterName(r.getReporter().getFirstName() + " " + r.getReporter().getLastName())
+                .reporterEmail(r.getReporter().getEmail())
+                .adminNotes(r.getAdminNotes())
+                .assignedAdminId(r.getAssignedAdmin() != null ? r.getAssignedAdmin().getUserId() : null)
+                .assignedAdminName(r.getAssignedAdmin() != null ? r.getAssignedAdmin().getFirstName() + " " + r.getAssignedAdmin().getLastName() : null);
+
+        if (r.getType() == com.joestate.backend.entities.Report.ReportType.PROPERTY) {
+            builder.propertyId(r.getProperty().getPropertyId())
+                    .propertyTitle(r.getProperty().getTitle())
+                    .ownerName(r.getProperty().getOwner().getFirstName() + " " + r.getProperty().getOwner().getLastName())
+                    .ownerEmail(r.getProperty().getOwner().getEmail());
+        } else if (r.getType() == com.joestate.backend.entities.Report.ReportType.USER) {
+            builder.reportedUserId(r.getReportedUser().getUserId())
+                    .reportedUserName(r.getReportedUser().getFirstName() + " " + r.getReportedUser().getLastName());
         }
 
-        // 2. Get recent reports
-        for (Report r : reportRepository.findTop5ByOrderByCreatedAtDesc()) {
-            java.util.Map<String, Object> map = new java.util.HashMap<>();
-            map.put("type", "REPORT_FILED");
-            map.put("message", "Property '" + r.getProperty().getTitle() + "' flagged for " + r.getReason() + ".");
-            map.put("timestamp", r.getCreatedAt());
-            activities.add(map);
-        }
-
-        // 3. Sort them together by time (Newest first)
-        activities.sort((a, b) -> ((java.time.LocalDateTime) b.get("timestamp")).compareTo((java.time.LocalDateTime) a.get("timestamp")));
-
-        // 4. Return only the top 6 events
-        return activities.size() > 6 ? activities.subList(0, 6) : activities;
+        return builder.build();
     }
 }

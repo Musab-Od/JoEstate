@@ -36,8 +36,9 @@ public class User {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private boolean isBanned = false;
+    private BanStatus banStatus = BanStatus.NONE;
 
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL)
     private List<Property> properties;
@@ -56,5 +57,12 @@ public class User {
         USER,
         ADMIN,
         PREMIUM
+    }
+    public enum BanStatus {
+        NONE,               // Fully active
+        MUTE_MESSAGES,      // Cannot send chat messages
+        MUTE_PUBLISHING,    // Cannot post new properties
+        MUTE_BOTH,          // Cannot send messages or post properties, but can still log in and browse
+        BANNED              // Completely blocked from logging in
     }
 }

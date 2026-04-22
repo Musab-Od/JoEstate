@@ -52,7 +52,7 @@ public class AuthService {
                 .orElseThrow(() -> new RuntimeException("Invalid email or password"));
 
         // 2. NOW check if they are banned (before checking password or making a token)
-        if (user.isBanned()) {
+        if (user.getBanStatus() == User.BanStatus.BANNED) {
             throw new RuntimeException("Your account has been suspended for violating terms of service.");
         }
 

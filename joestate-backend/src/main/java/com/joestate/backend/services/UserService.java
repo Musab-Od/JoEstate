@@ -17,7 +17,6 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final String UPLOAD_DIR = "uploads/";
     private final PasswordEncoder passwordEncoder;
 
     // 1. Get Current User Profile
@@ -75,6 +74,7 @@ public class UserService {
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
             // Create directory if not exists
+            String UPLOAD_DIR = "uploads/";
             Path uploadPath = Paths.get(UPLOAD_DIR);
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
@@ -126,7 +126,7 @@ public class UserService {
                 .profilePictureUrl(u.getProfilePictureUrl())
                 .role(u.getRole().name())
                 .isVerified(u.isVerified())
-                .isBanned(u.isBanned())
+                .banStatus(u.getBanStatus().name())
                 .build();
     }
 }

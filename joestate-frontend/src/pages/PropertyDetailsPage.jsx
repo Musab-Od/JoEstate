@@ -139,6 +139,26 @@ const PropertyDetailsPage = () => {
     if (loading) return <div className="min-h-screen flex items-center justify-center text-blue-600 font-bold">Loading Property...</div>;
     if (!property) return <div className="min-h-screen flex items-center justify-center text-red-500 font-bold">Property not found.</div>;
 
+    // SECURITY BOUNCER ---
+    const isOwner = currentUser && currentUser.userId === property.ownerId;
+    const isAdmin = currentUser && currentUser.role === 'ADMIN';
+
+    // If it's suspended, block anyone who isn't the Owner or an Admin
+    if (property.status === 'SUSPENDED' && !isOwner && !isAdmin) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4 text-center">
+                <ShieldAlert className="w-16 h-16 text-red-500 mb-4" />
+                <h1 className="text-3xl font-black text-gray-900 mb-2">Listing Unavailable</h1>
+                <p className="text-gray-500 font-medium max-w-md">
+                    This property is currently under review by our Trust & Safety team and cannot be viewed by the public.
+                </p>
+                <button onClick={() => navigate("/")} className="mt-6 px-6 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 transition">
+                    Return to Homepage
+                </button>
+            </div>
+        );
+    }
+
     const formatPrice = (price) => new Intl.NumberFormat('en-JO').format(price);
 
     const rawImages = property.imageUrls && property.imageUrls.length > 0
@@ -436,9 +456,17 @@ const PropertyDetailsPage = () => {
                                     <button onClick={() => setShowPhone(!showPhone)} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-200">
                                         <Phone className="w-5 h-5" /> {showPhone ? property.ownerPhone : "Show Phone Number"}
                                     </button>
-                                    <button onClick={handleStartChat} className="w-full py-4 bg-white border-2 border-gray-200 text-gray-700 font-bold rounded-xl flex items-center justify-center gap-2 hover:border-gray-300 hover:bg-gray-50 transition-all">
-                                        <MessageCircle className="w-5 h-5" /> Chat with Owner
-                                    </button>
+
+                                    {/* MUTE MESSAGES CHECK */}
+                                    {currentUser && (currentUser.banStatus === 'MUTE_MESSAGES' || currentUser.banStatus === 'BANNED') ? (
+                                        <div className="w-full py-4 bg-gray-100 border-2 border-gray-200 text-gray-400 font-bold rounded-xl flex items-center justify-center gap-2 cursor-not-allowed">
+                                            <ShieldAlert className="w-5 h-5" /> Messaging Restricted
+                                        </div>
+                                    ) : (
+                                        <button onClick={handleStartChat} className="w-full py-4 bg-white border-2 border-gray-200 text-gray-700 font-bold rounded-xl flex items-center justify-center gap-2 hover:border-gray-300 hover:bg-gray-50 transition-all">
+                                            <MessageCircle className="w-5 h-5" /> Chat with Owner
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="bg-gray-100 border border-gray-200 rounded-2xl p-6 text-center space-y-2">

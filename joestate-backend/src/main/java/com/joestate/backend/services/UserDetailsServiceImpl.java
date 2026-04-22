@@ -6,6 +6,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import com.joestate.backend.entities.User;
 
 @Service
 @RequiredArgsConstructor
@@ -20,7 +21,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("User Not Found with email: " + email));
 
         // 2. THE BAN CHECK: Slam the door if they are banned!
-        if (user.isBanned()) {
+        if (user.getBanStatus() == User.BanStatus.BANNED) {
             throw new org.springframework.security.authentication.LockedException("This account has been permanently banned by an Administrator.");
         }
 

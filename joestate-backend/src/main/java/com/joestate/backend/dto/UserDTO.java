@@ -21,7 +21,7 @@ public class UserDTO {
     private String profilePictureUrl;
     private String role;
     private boolean isVerified;
-    private boolean isBanned;
+    private String banStatus;
     private java.time.LocalDateTime createdAt;
 
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) // Allows sending to server, but hides from response
