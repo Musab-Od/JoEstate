@@ -104,11 +104,21 @@ const AdminUsers = () => {
 
     const handleSuspendProperty = async (propertyId, currentStatus, userId = null) => {
         const action = currentStatus === 'SUSPENDED' ? 'Reactivate' : 'Suspend';
-        if (!window.confirm(`Are you sure you want to ${action} this property?`)) return;
+
+        // 1. Force the admin to write an audit note!
+        const auditNote = window.prompt(`You are about to ${action.toLowerCase()} this property.\n\nPlease enter the mandatory audit note for the Archives:`);
+
+        if (auditNote === null) return; // Admin clicked Cancel
+        if (auditNote.trim() === "") {
+            alert("Action aborted. An audit note is mandatory.");
+            return;
+        }
 
         const token = localStorage.getItem("token");
         try {
-            await axios.put(`/admin/properties/${propertyId}/suspend-toggle`, {}, { headers: { Authorization: `Bearer ${token}` } });
+            // 2. Send the property toggle command WITH the notes
+            await axios.put(`/admin/properties/${propertyId}/suspend-toggle?notes=${encodeURIComponent(auditNote)}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+
             const newStatus = currentStatus === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
 
             if (userId && userProperties[userId]) {
@@ -120,6 +130,8 @@ const AdminUsers = () => {
             if (activeTab === "SUSPENDED_PROPERTIES") {
                 setSuspendedProps(prev => prev.filter(p => p.propertyId !== propertyId));
             }
+
+            alert("Action executed and saved to Resolved Archives.");
         } catch (err) {
             alert("Failed to update property status.");
         }

@@ -10,7 +10,7 @@ const AdminLayout = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-100 flex">
+        <div className="h-screen bg-gray-100 flex overflow-hidden">
             {/* --- THE SIDEBAR --- */}
             <aside className="w-64 bg-slate-900 text-white flex flex-col shadow-2xl">
                 <div className="p-6">

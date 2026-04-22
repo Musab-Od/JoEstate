@@ -29,7 +29,8 @@ public class Notification {
     private User sender;
 
     public enum NotificationType {
-        FAVORITE
+        FAVORITE,
+        SYSTEM_ALERT
     }
 
     @Enumerated(EnumType.STRING)

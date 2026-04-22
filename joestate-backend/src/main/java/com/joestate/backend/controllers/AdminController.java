@@ -71,9 +71,14 @@ public class AdminController {
     }
 
     @PutMapping("/properties/{propertyId}/suspend-toggle")
-    public ResponseEntity<String> togglePropertySuspension(@PathVariable Long propertyId) {
-        adminService.togglePropertySuspension(propertyId);
-        return ResponseEntity.ok("Property suspension toggled.");
+    public ResponseEntity<String> togglePropertySuspension(
+            @PathVariable Long propertyId,
+            @RequestParam(required = false, defaultValue = "Manual Admin Override") String notes) {
+
+        String adminEmail = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        adminService.togglePropertySuspension(propertyId, notes, adminEmail);
+
+        return ResponseEntity.ok("Property suspension toggled and audited.");
     }
 
     // ==========================================

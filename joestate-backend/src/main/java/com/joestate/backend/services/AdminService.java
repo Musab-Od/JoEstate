@@ -21,6 +21,7 @@ public class AdminService {
     private final PropertyRepository propertyRepository;
     private final ReportRepository reportRepository;
     private final VerificationRequestRepository verificationRequestRepository;
+    private final NotificationService notificationService;
 
     // ==========================================
     // 1. DASHBOARD & TELEMETRY
@@ -150,16 +151,39 @@ public class AdminService {
     }
 
     @Transactional
-    public void togglePropertySuspension(Long propertyId) {
+    public void togglePropertySuspension(Long propertyId, String notes, String adminEmail) {
         com.joestate.backend.entities.Property property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new RuntimeException("Property not found"));
 
+        User admin = userRepository.findByEmail(adminEmail)
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+        String actionTaken;
+
+        // Toggle Status & Send Notification
         if (property.getStatus() == com.joestate.backend.entities.Property.Status.SUSPENDED) {
             property.setStatus(com.joestate.backend.entities.Property.Status.ACTIVE);
+            actionTaken = "REACTIVATED";
+            notificationService.createSystemAlertNotification(property.getOwner(), "Good news! Your property '" + property.getTitle() + "' has been reactivated.", property.getPropertyId());
         } else {
             property.setStatus(com.joestate.backend.entities.Property.Status.SUSPENDED);
+            actionTaken = "SUSPENDED";
+            notificationService.createSystemAlertNotification(property.getOwner(), "URGENT: Your property '" + property.getTitle() + "' has been suspended by the Trust & Safety team.", property.getPropertyId());
         }
         propertyRepository.save(property);
+
+        // CREATE THE AUDIT TRAIL (Pseudo-Report)
+        Report auditLog = new Report();
+        auditLog.setType(Report.ReportType.PROPERTY);
+        auditLog.setProperty(property);
+        auditLog.setReporter(admin); // Admin is technically the reporter
+        auditLog.setAssignedAdmin(admin); // Admin handled it
+        auditLog.setReason(Report.Reason.INAPPROPRIATE); // Reusing enum
+        auditLog.setComment("MANUAL PROPERTY OVERRIDE");
+        auditLog.setAdminNotes(notes + " (Action: " + actionTaken + ")");
+        auditLog.setStatus(Report.ReportStatus.RESOLVED_DISMISSED); // Saved directly to archives
+
+        reportRepository.save(auditLog);
     }
 
     // ==========================================
@@ -235,6 +259,12 @@ public class AdminService {
                     report.setStatus(Report.ReportStatus.RESOLVED_DELETED);
                     property.setStatus(Property.Status.SUSPENDED);
                     propertyRepository.save(property);
+
+                    notificationService.createSystemAlertNotification(
+                            property.getOwner(),
+                            "URGENT: Your property '" + property.getTitle() + "' has been suspended following a Trust & Safety review.",
+                            property.getPropertyId()
+                    );
                 } else {
                     throw new RuntimeException("Cannot delete property on a User-type report.");
                 }

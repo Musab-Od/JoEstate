@@ -79,6 +79,23 @@ public class NotificationService {
         notificationRepository.saveAll(unread);
     }
 
+    // 6. Generate a System Alert Notification (e.g., Suspension)
+    @Transactional
+    public void createSystemAlertNotification(User receiver, String content, Long relatedPropertyId) {
+        Notification notification = Notification.builder()
+                .receiver(receiver)
+                .sender(null) // It's from the System!
+                .type(Notification.NotificationType.SYSTEM_ALERT)
+                .content(content)
+                .relatedId(relatedPropertyId)
+                .build();
+
+        notificationRepository.save(notification);
+
+        // BEEP the owner's global WebSocket channel!
+        messagingTemplate.convertAndSend("/topic/user/" + receiver.getEmail(), "{\"type\":\"NEW_NOTIFICATION\"}");
+    }
+
     private NotificationDTO mapToDTO(Notification n) {
         return NotificationDTO.builder()
                 .notificationId(n.getNotificationId())

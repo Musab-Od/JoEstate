@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "../api/axios";
-import { User, LogOut, Menu, PlusCircle, Building2, ChevronDown, LayoutDashboard, Bell, MessageCircle, Heart, MessageSquare, ShieldAlert } from "lucide-react";
+import { User, LogOut, Menu, PlusCircle, Building2, ChevronDown, LayoutDashboard, Bell, MessageCircle, Heart, MessageSquare, ShieldAlert, ExternalLink } from "lucide-react";
 import { useWebSocket } from "../context/WebSocketContext";
 
 const Header = () => {
@@ -189,14 +189,24 @@ const Header = () => {
                                                 notifications.map(notif => (
                                                     <div key={notif.notificationId} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition ${!notif.read ? 'bg-blue-50/30' : ''}`}>
                                                         <div className="flex gap-3">
-                                                            <div className="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center shrink-0 border border-pink-200">
-                                                                {notif.senderAvatarUrl ? <img src={`http://localhost:8080/uploads/${notif.senderAvatarUrl}`} alt="User" className="w-full h-full rounded-full object-cover" /> : <Heart className="w-5 h-5 text-pink-500 fill-current" />}
+                                                            {/* DYNAMIC ICON: Red Shield for System, Pink Heart for Favorites */}
+                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border ${notif.type === 'SYSTEM_ALERT' ? 'bg-red-50 border-red-200 text-red-600' : 'bg-pink-100 border-pink-200 text-pink-500'}`}>
+                                                                {notif.senderAvatarUrl ? (
+                                                                    <img src={`http://localhost:8080/uploads/${notif.senderAvatarUrl}`} alt="User" className="w-full h-full rounded-full object-cover" />
+                                                                ) : notif.type === 'SYSTEM_ALERT' ? (
+                                                                    <ShieldAlert className="w-5 h-5" />
+                                                                ) : (
+                                                                    <Heart className="w-5 h-5 fill-current" />
+                                                                )}
                                                             </div>
-                                                            <div>
-                                                                <p className="text-sm text-gray-800">{notif.content}</p>
+
+                                                            <div className="flex-grow">
+                                                                <p className={`text-sm ${notif.type === 'SYSTEM_ALERT' ? 'font-bold text-red-700' : 'text-gray-800'}`}>
+                                                                    {notif.content}
+                                                                </p>
                                                                 <p className="text-[10px] text-gray-400 mt-1">{new Date(notif.createdAt).toLocaleDateString()}</p>
 
-                                                                {/* Interactive Action: Message Buyer */}
+                                                                {/* DYNAMIC ACTION BUTTONS */}
                                                                 {notif.type === 'FAVORITE' && notif.senderEmail && (
                                                                     <button
                                                                         onClick={() => handleMessageBuyer(notif.relatedId, notif.senderEmail, notif.notificationId)}
@@ -204,6 +214,16 @@ const Header = () => {
                                                                     >
                                                                         <MessageSquare className="w-3 h-3" /> Message {notif.senderName}
                                                                     </button>
+                                                                )}
+
+                                                                {notif.type === 'SYSTEM_ALERT' && notif.relatedId && (
+                                                                    <Link
+                                                                        to={`/properties/${notif.relatedId}`}
+                                                                        onClick={() => setIsNotifOpen(false)}
+                                                                        className="mt-2 text-xs flex items-center gap-1 font-bold text-gray-600 hover:text-gray-900 transition"
+                                                                    >
+                                                                        <ExternalLink className="w-3 h-3" /> Inspect Property
+                                                                    </Link>
                                                                 )}
                                                             </div>
                                                         </div>
