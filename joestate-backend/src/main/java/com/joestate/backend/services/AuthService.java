@@ -29,6 +29,9 @@ public class AuthService {
         user.setEmail(request.getEmail());
         user.setPhoneNumber(request.getPhoneNumber());
         user.setPasswordHash(passwordEncoder.encode(request.getPassword())); // Hash it
+        user.setRole(User.Role.USER);
+        user.setBanStatus(User.BanStatus.NONE);
+        user.setVerified(false);
 
         userRepository.save(user);
 
