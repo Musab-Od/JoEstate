@@ -44,6 +44,7 @@ public class AuthService {
                 .lastName(user.getLastName())
                 .role(user.getRole().name())
                 .userId(user.getUserId())
+                .isPremium(user.isPremium())
                 .build();
     }
 
@@ -73,6 +74,7 @@ public class AuthService {
                 .lastName(user.getLastName())
                 .role(user.getRole().name())
                 .userId(user.getUserId())
+                .isPremium(user.isPremium())
                 .build();
     }
 }

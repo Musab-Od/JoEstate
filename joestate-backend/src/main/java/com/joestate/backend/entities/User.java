@@ -33,6 +33,9 @@ public class User {
 
     private boolean isVerified = false;
 
+    @Column(nullable = false)
+    private boolean isPremium = false;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

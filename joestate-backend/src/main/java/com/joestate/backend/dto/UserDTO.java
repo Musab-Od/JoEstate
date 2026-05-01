@@ -21,6 +21,7 @@ public class UserDTO {
     private String profilePictureUrl;
     private String role;
     private boolean isVerified;
+    private boolean isPremium;
     private String banStatus;
     private java.time.LocalDateTime createdAt;
 

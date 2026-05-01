@@ -15,4 +15,5 @@ public class AuthResponse {
     private String lastName;
     private String role; // For showing/hiding admin features in frontend
     private Long userId; // For routing to user-specific pages
+    private boolean isPremium;
 }

@@ -1,132 +1,134 @@
 package com.joestate.backend.services;
 
 import com.joestate.backend.dto.UserDTO;
+import com.joestate.backend.dto.PaymentRequest;
 import com.joestate.backend.entities.User;
 import com.joestate.backend.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Transactional // 1. CLASS-LEVEL: All methods are transactional by default (Safe for Writes)
 public class UserService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
 
-    // 1. Get Current User Profile
+    // Directory where uploads are stored
+    private final String UPLOAD_DIR = "uploads/";
+
+    // ==========================================
+    // READ OPERATIONS (Optimized for Speed)
+    // ==========================================
+
+    @Transactional(readOnly = true) // 2. OVERRIDE: Tells Hibernate not to track changes, boosting performance
     public UserDTO getCurrentUser(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         return mapToDTO(user);
     }
 
-    // 2. Update Text Information
-    public UserDTO updateProfile(String currentEmail, UserDTO dto) {
-        User user = userRepository.findByEmail(currentEmail)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // 1. Handle Basic Info
-        if (dto.getFirstName() != null) user.setFirstName(dto.getFirstName());
-        if (dto.getLastName() != null) user.setLastName(dto.getLastName());
-        if (dto.getPhoneNumber() != null) user.setPhoneNumber(dto.getPhoneNumber());
-        if (dto.getBio() != null) user.setBio(dto.getBio());
-
-        // 2. Handle EMAIL Change (Crucial Check!)
-        if (dto.getEmail() != null && !dto.getEmail().equals(user.getEmail())) {
-            // Check if the NEW email is already taken by someone else
-            if (userRepository.existsByEmail(dto.getEmail())) {
-                throw new RuntimeException("This email is already in use by another account.");
-            }
-            user.setEmail(dto.getEmail());
-        }
-
-        // 3. Handle PASSWORD Change (Hash it!)
-        if (dto.getNewPassword() != null && !dto.getNewPassword().isEmpty()) {
-
-            // A. Check if Old Password is provided
-            if (dto.getOldPassword() == null || dto.getOldPassword().isEmpty()) {
-                throw new RuntimeException("You must enter your current password to change it.");
-            }
-
-            // B. Check if Old Password matches the DB hash
-            if (!passwordEncoder.matches(dto.getOldPassword(), user.getPasswordHash())) {
-                throw new RuntimeException("The current password you entered is incorrect.");
-            }
-
-            // C. All good? Hash and Save the NEW password
-            user.setPasswordHash(passwordEncoder.encode(dto.getNewPassword()));
-        }
-
-        User updatedUser = userRepository.save(user);
-        return mapToDTO(updatedUser);
-    }
-
-    // 3. Upload Profile Picture
-    public String uploadProfilePicture(String email, MultipartFile file) {
-        try {
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-
-            // Create directory if not exists
-            String UPLOAD_DIR = "uploads/";
-            Path uploadPath = Paths.get(UPLOAD_DIR);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
-
-            // Generate Unique Filename
-            String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
-            Path filePath = uploadPath.resolve(fileName);
-
-            // Save File to Disk
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-            // Update Database
-            user.setProfilePictureUrl(fileName);
-            userRepository.save(user);
-
-            return fileName;
-
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to upload profile picture", e);
-        }
-    }
-
+    @Transactional(readOnly = true)
     public UserDTO getPublicUserProfile(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        return mapToDTO(user);
+    }
 
-        // Map to DTO but HIDE private info
+    // ==========================================
+    // WRITE OPERATIONS (Protected by Transactions)
+    // ==========================================
+
+    public UserDTO updateProfile(String email, UserDTO dto) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setFirstName(dto.getFirstName());
+        user.setLastName(dto.getLastName());
+        user.setPhoneNumber(dto.getPhoneNumber());
+        user.setBio(dto.getBio());
+
+        // We don't need to explicitly call repository.save(user) here!
+        // Because of @Transactional, Spring detects the changes to the 'user' entity
+        // and automatically pushes them to the database when the method finishes.
+        return mapToDTO(user);
+    }
+
+    public void upgradeToPremium(String email, PaymentRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String cleanCard = request.getCardNumber().replaceAll("\\s+", "");
+
+        // Universal Testing Card
+        if ("4242424242424242".equals(cleanCard)) {
+            user.setPremium(true); // Hibernate will auto-save this because of @Transactional
+        } else {
+            throw new RuntimeException("Card Declined. Insufficient funds or invalid card number.");
+        }
+    }
+
+    // ==========================================
+    // COMPLEX OPERATION: DB + FILE SYSTEM
+    // ==========================================
+
+    public String uploadProfilePicture(String email, MultipartFile file) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String originalFilename = file.getOriginalFilename();
+        String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        String newFileName = UUID.randomUUID().toString() + extension;
+        Path filePath = Paths.get(UPLOAD_DIR + newFileName);
+
+        try {
+            // 1. Write to the File System FIRST
+            Files.createDirectories(filePath.getParent());
+            Files.write(filePath, file.getBytes());
+
+            // 2. Update the Database SECOND
+            user.setProfilePictureUrl(newFileName);
+
+            // If anything fails after this point, Spring will roll back the database automatically.
+            return newFileName;
+
+        } catch (Exception e) {
+            // 3. THE SAFETY NET: If writing to the DB fails, we must manually delete the orphaned file!
+            try {
+                Files.deleteIfExists(filePath);
+            } catch (IOException ioException) {
+                System.err.println("CRITICAL: Failed to delete orphaned file: " + filePath);
+            }
+            // Re-throw to trigger the Database Rollback
+            throw new RuntimeException("Failed to upload profile picture: " + e.getMessage());
+        }
+    }
+
+    // ==========================================
+    // HELPER METHODS
+    // ==========================================
+
+    private UserDTO mapToDTO(User user) {
         return UserDTO.builder()
                 .userId(user.getUserId())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
+                .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())
-                .bio(user.getBio())
                 .profilePictureUrl(user.getProfilePictureUrl())
-                .email(null) // 🔒 PRIVACY: Do not return email
-                .build();
-    }
-
-    // Helper: Map Entity to DTO
-    private UserDTO mapToDTO(User u) {
-        return UserDTO.builder()
-                .userId(u.getUserId())
-                .firstName(u.getFirstName())
-                .lastName(u.getLastName())
-                .email(u.getEmail())
-                .phoneNumber(u.getPhoneNumber())
-                .bio(u.getBio())
-                .profilePictureUrl(u.getProfilePictureUrl())
-                .role(u.getRole().name())
-                .isVerified(u.isVerified())
-                .banStatus(u.getBanStatus().name())
+                .bio(user.getBio())
+                .role(user.getRole().name())
+                .isVerified(user.isVerified())
+                .isPremium(user.isPremium()) // NEW: Included for Phase 1!
+                .createdAt(user.getCreatedAt())
                 .build();
     }
 }

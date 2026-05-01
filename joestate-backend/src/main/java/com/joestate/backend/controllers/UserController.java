@@ -41,6 +41,16 @@ public class UserController {
         return ResponseEntity.ok(fileName);
     }
 
+    // 3.5 Upgrade to Premium (Mock Checkout)
+    @PostMapping("/me/upgrade")
+    public ResponseEntity<String> upgradeToPremium(
+            Authentication authentication,
+            @RequestBody com.joestate.backend.dto.PaymentRequest request) {
+
+        userService.upgradeToPremium(authentication.getName(), request);
+        return ResponseEntity.ok("Payment Successful! Welcome to Premium.");
+    }
+
     // 4. Get My Properties
     @GetMapping("/me/properties")
     public ResponseEntity<List<PropertyDTO>> getMyProperties(Authentication authentication) {
