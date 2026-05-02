@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Upload, X, Home, DollarSign, MapPin, Layout, BedDouble, Bath, FileText, Briefcase } from "lucide-react";
+import { Upload, X, Home, DollarSign, MapPin, Layout, BedDouble, Bath, FileText, Briefcase, Crown } from "lucide-react";
 import axios from "../api/axios";
+import PremiumCheckoutModal from "../components/PremiumCheckoutModal";
 
 const AddPropertyPage = () => {
     const navigate = useNavigate();
@@ -10,6 +11,9 @@ const AddPropertyPage = () => {
 
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
+
+    const [isPremium, setIsPremium] = useState(false);
+    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
     const [formData, setFormData] = useState({
         title: "",
@@ -75,6 +79,16 @@ const AddPropertyPage = () => {
         }
     }, [formData.purpose]);
 
+    // Fetch premium status on load
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (token) {
+            axios.get("/users/me", { headers: { Authorization: `Bearer ${token}` } })
+                .then(res => setIsPremium(res.data.isPremium))
+                .catch(err => console.log(err));
+        }
+    }, []);
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         if (name === "price" || name === "area") {
@@ -93,8 +107,15 @@ const AddPropertyPage = () => {
         if (!e.target.files) return;
         const files = Array.from(e.target.files);
 
-        if (previews.length + files.length > 10) {
-            alert("You can only upload a maximum of 10 photos.");
+        // ENFORCE LIMIT FOR FREE USERS
+        if (!isPremium && previews.length + files.length > 10) {
+            setIsCheckoutOpen(true); // Pop the modal immediately!
+            return;
+        }
+
+        // ENFORCE PREMIUM LIMIT (Just to be safe on the server)
+        if (isPremium && previews.length + files.length > 50) {
+            alert("Maximum 50 photos allowed even for premium users.");
             return;
         }
 
@@ -338,9 +359,27 @@ const AddPropertyPage = () => {
                             <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                 <FileText className="w-5 h-5 text-blue-600" /> Photos
                                 <span className="text-sm font-semibold text-gray-500 ml-2">
-                                    ({previews.length}/10 selected)
+                                    ({previews.length}/{isPremium ? '50' : '10'} selected)
                                 </span>
                             </h3>
+
+                            {/* --- CONTEXTUAL UPSELL BANNER --- */}
+                            {!isPremium && (
+                                <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-yellow-400 p-2 rounded-full text-white shrink-0">
+                                            <Crown className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-yellow-900 text-sm">Need more photos or videos?</h4>
+                                            <p className="text-yellow-800 text-xs mt-0.5">Free accounts are limited to 10 photos. Upgrade to upload up to 50 photos and videos!</p>
+                                        </div>
+                                    </div>
+                                    <button type="button" onClick={() => setIsCheckoutOpen(true)} className="w-full md:w-auto bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-5 py-2.5 rounded-full transition shadow-md whitespace-nowrap">
+                                        Unlock Premium
+                                    </button>
+                                </div>
+                            )}
 
                             <div className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer relative group">
                                 <input type="file" multiple accept="image/*" onChange={handleImageChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
@@ -375,6 +414,16 @@ const AddPropertyPage = () => {
                     </form>
                 </div>
             </div>
+            {/* The Premium Checkout Modal */}
+            <PremiumCheckoutModal
+                isOpen={isCheckoutOpen}
+                onClose={() => setIsCheckoutOpen(false)}
+                onSuccess={() => {
+                    setIsCheckoutOpen(false);
+                    setIsPremium(true); // Instantly unlock the UI!
+                    alert("Success! You can now upload up to 50 photos.");
+                }}
+            />
         </div>
     );
 };

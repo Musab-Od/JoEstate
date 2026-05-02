@@ -161,6 +161,14 @@ public class PropertyService {
             property.setRentFrequency(dto.getRentFrequency());
         }
 
+        int photoCount = dto.getImageFiles() != null ? dto.getImageFiles().size() : 0;
+        if (!owner.isPremium() && photoCount > 10) {
+            throw new RuntimeException("Free accounts are limited to 10 photos. Please upgrade to Premium.");
+        }
+        if (owner.isPremium() && photoCount > 50) {
+            throw new RuntimeException("Premium accounts are limited to a maximum of 50 photos.");
+        }
+
         Property savedProperty = propertyRepository.save(property);
         saveImages(dto.getImageFiles(), savedProperty);
     }
@@ -201,6 +209,18 @@ public class PropertyService {
                 .filter(img -> dto.getExistingImageUrls() == null ||
                         !dto.getExistingImageUrls().contains(img.getImageUrl()))
                 .collect(Collectors.toList());
+
+        // --- BACKEND PREMIUM VALIDATION ---
+        int keptImagesCount = property.getImages().size() - toDelete.size();
+        int newImagesCount = dto.getImageFiles() != null ? dto.getImageFiles().size() : 0;
+        int totalImages = keptImagesCount + newImagesCount;
+
+        if (!property.getOwner().isPremium() && totalImages > 10) {
+            throw new RuntimeException("Free accounts are limited to 10 photos. Please upgrade to Premium.");
+        }
+        if (property.getOwner().isPremium() && totalImages > 50) {
+            throw new RuntimeException("Premium accounts are limited to a maximum of 50 photos.");
+        }
 
         // 2. Remove them from disk and the DB list
         deletePhysicalImages(toDelete);

@@ -3,7 +3,9 @@ package com.joestate.backend.services;
 import com.joestate.backend.dto.UserDTO;
 import com.joestate.backend.dto.PaymentRequest;
 import com.joestate.backend.entities.User;
+import com.joestate.backend.entities.Subscription;
 import com.joestate.backend.repositories.UserRepository;
+import com.joestate.backend.repositories.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +15,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
@@ -21,6 +24,7 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final SubscriptionRepository subscriptionRepository;
 
     // Directory where uploads are stored
     private final String UPLOAD_DIR = "uploads/";
@@ -66,11 +70,46 @@ public class UserService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        String cleanCard = request.getCardNumber().replaceAll("\\s+", "");
+        // 1. Check if they are ALREADY Premium
+        if (user.isPremium()) {
+            throw new RuntimeException("You already have an active Premium subscription.");
+        }
 
-        // Universal Testing Card
+        // 2. Validate Expiry Date Format (MM/YY)
+        if (request.getExpiryDate() == null || !request.getExpiryDate().matches("^(0[1-9]|1[0-2])/\\d{2}$")) {
+            throw new RuntimeException("Invalid expiry date. Must be in MM/YY format.");
+        }
+
+        // 3. Validate CVC (Exactly 3 digits)
+        if (request.getCvc() == null || !request.getCvc().matches("^\\d{3}$")) {
+            throw new RuntimeException("Invalid CVC. Must be exactly 3 digits.");
+        }
+
+        // 4. Validate Card Number
+        String cleanCard = request.getCardNumber() != null ? request.getCardNumber().replaceAll("\\s+", "") : "";
+
         if ("4242424242424242".equals(cleanCard)) {
-            user.setPremium(true); // Hibernate will auto-save this because of @Transactional
+
+            // --- THE NEW ENTERPRISE LOGIC ---
+
+            // A. Create the official Subscription Record
+            Subscription subscription = new Subscription();
+            subscription.setUser(user);
+            subscription.setType(Subscription.SubscriptionType.PREMIUM);
+            subscription.setStartDate(LocalDateTime.now());
+            subscription.setEndDate(LocalDateTime.now().plusMonths(1)); // Expires in 1 month
+            subscription.setActive(true);
+
+            // Generate a fake bank receipt ID for our records
+            subscription.setPaymentReference("MOCK_TXN_" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+
+            subscriptionRepository.save(subscription);
+
+            // B. Update the fast-access boolean flag on the User
+            user.setPremium(true);
+
+            // (Because of @Transactional, 'user' is automatically saved here)
+
         } else {
             throw new RuntimeException("Card Declined. Insufficient funds or invalid card number.");
         }
@@ -127,7 +166,7 @@ public class UserService {
                 .bio(user.getBio())
                 .role(user.getRole().name())
                 .isVerified(user.isVerified())
-                .isPremium(user.isPremium()) // NEW: Included for Phase 1!
+                .isPremium(user.isPremium())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

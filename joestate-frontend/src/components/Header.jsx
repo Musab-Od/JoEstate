@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "../api/axios";
-import { User, LogOut, Menu, PlusCircle, Building2, ChevronDown, LayoutDashboard, Bell, MessageCircle, Heart, MessageSquare, ShieldAlert, ExternalLink } from "lucide-react";
+import { User, LogOut, Menu, PlusCircle, Building2, ChevronDown, LayoutDashboard, Bell, MessageCircle, Heart, MessageSquare, ShieldAlert, ExternalLink, Crown } from "lucide-react";
 import { useWebSocket } from "../context/WebSocketContext";
+import PremiumCheckoutModal from "./PremiumCheckoutModal";
 
 const Header = () => {
     const navigate = useNavigate();
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userName, setUserName] = useState("");
     const [avatarUrl, setAvatarUrl] = useState(null);
+    const [isPremium, setIsPremium] = useState(false);
+    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
     // Menus State
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -40,6 +43,7 @@ const Header = () => {
                 .then(res => {
                     setUserName(res.data.firstName);
                     setBanStatus(res.data.banStatus);
+                    setIsPremium(res.data.isPremium);
                     if (res.data.profilePictureUrl) {
                         setAvatarUrl(`http://localhost:8080/uploads/${res.data.profilePictureUrl}`);
                     }
@@ -236,7 +240,17 @@ const Header = () => {
                             </div>
                         </div>
                     )}
-
+                    {/* --- THE UPSELL: GO PREMIUM --- */}
+                    {isLoggedIn && !isPremium && (
+                        <button onClick={() => setIsCheckoutOpen(true)} className="hidden md:flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-slate-900 px-4 py-2 rounded-full text-xs font-black shadow-lg shadow-yellow-500/30 hover:-translate-y-0.5 transition uppercase tracking-wide">
+                            <Crown className="w-4 h-4" /> Go Premium
+                        </button>
+                    )}
+                    {isLoggedIn && isPremium && (
+                        <div className="hidden md:flex items-center gap-1.5 border border-yellow-400 bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider">
+                            <Crown className="w-3 h-3 text-yellow-500" /> VIP
+                        </div>
+                    )}
                     {/* Add Property Button */}
                     {banStatus === 'MUTE_PUBLISHING' || banStatus === 'BANNED' || banStatus === 'MUTE_BOTH' ? (
                         <button disabled className="hidden md:flex items-center gap-2 bg-gray-200 text-gray-500 px-5 py-2.5 rounded-full text-sm font-bold cursor-not-allowed border border-gray-300">
@@ -309,6 +323,16 @@ const Header = () => {
                     </div>
                 </div>
             )}
+            {/* The Premium Checkout Modal */}
+            <PremiumCheckoutModal
+                isOpen={isCheckoutOpen}
+                onClose={() => setIsCheckoutOpen(false)}
+                onSuccess={() => {
+                    setIsCheckoutOpen(false);
+                    alert("Welcome to Premium! Your account has been upgraded.");
+                    window.location.reload(); // Reload to fetch new VIP status
+                }}
+            />
         </header>
     );
 };
