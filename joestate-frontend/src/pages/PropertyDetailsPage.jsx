@@ -3,6 +3,27 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "../api/axios";
 import { MapPin, BedDouble, Bath, Square, Phone, MessageCircle, Heart, Share2, Calendar, X, ChevronLeft, ChevronRight, Grid, User, Trash2, Edit, CheckCircle, Flag, AlertTriangle, ShieldAlert } from "lucide-react";
 
+// --- SMART MEDIA RENDERER ---
+const MediaRenderer = ({ src, alt, className, autoPlay = true, controls = false }) => {
+    if (!src) return null;
+    const isVideo = src.endsWith('.mp4') || src.endsWith('.webm');
+
+    if (isVideo) {
+        return (
+            <video
+                src={src}
+                className={className}
+                autoPlay={autoPlay}
+                loop
+                muted={!controls}
+                controls={controls}
+                playsInline
+            />
+        );
+    }
+    return <img src={src} alt={alt} className={className} />;
+};
+
 const PropertyDetailsPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -14,6 +35,7 @@ const PropertyDetailsPage = () => {
     const [isLiked, setIsLiked] = useState(false);
 
     const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+
     // --- REPORT MODAL STATE ---
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [reportReason, setReportReason] = useState("FRAUD");
@@ -93,12 +115,10 @@ const PropertyDetailsPage = () => {
             return;
         }
         try {
-            // Call the backend to get or create the thread ID
             const res = await axios.post(`/chat/start/${id}`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const threadId = res.data;
-            // Teleport the user to the messages page with the thread ID in the URL
             navigate(`/messages?thread=${threadId}`);
         } catch (err) {
             console.error(err);
@@ -106,7 +126,6 @@ const PropertyDetailsPage = () => {
         }
     };
 
-    // --- GP2: STATUS CHANGE HANDLER ---
     const handleStatusChange = async (newStatus) => {
         if (window.confirm(`Are you sure you want to mark this as ${newStatus}?`)) {
             try {
@@ -114,7 +133,6 @@ const PropertyDetailsPage = () => {
                 await axios.patch(`/properties/${id}/status?status=${newStatus}`, {}, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                // Update local UI immediately
                 setProperty(prev => ({ ...prev, status: newStatus }));
             } catch (err) {
                 alert("Failed to update status.");
@@ -139,11 +157,9 @@ const PropertyDetailsPage = () => {
     if (loading) return <div className="min-h-screen flex items-center justify-center text-blue-600 font-bold">Loading Property...</div>;
     if (!property) return <div className="min-h-screen flex items-center justify-center text-red-500 font-bold">Property not found.</div>;
 
-    // SECURITY BOUNCER ---
     const isOwner = currentUser && currentUser.userId === property.ownerId;
     const isAdmin = currentUser && currentUser.role === 'ADMIN';
 
-    // If it's suspended, block anyone who isn't the Owner or an Admin
     if (property.status === 'SUSPENDED' && !isOwner && !isAdmin) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4 text-center">
@@ -167,8 +183,6 @@ const PropertyDetailsPage = () => {
     const images = rawImages;
 
     const ownerAvatar = property.ownerProfilePictureUrl ? `http://localhost:8080/uploads/${property.ownerProfilePictureUrl}` : null;
-
-    // Helper variables for UI logic
     const isActive = property.status === 'ACTIVE';
     const soldOrRentedText = property.purpose === 'BUY' ? 'SOLD' : 'RENTED';
 
@@ -182,7 +196,7 @@ const PropertyDetailsPage = () => {
         }
 
         setIsSubmittingReport(true);
-        setReportError(""); // Clear any previous errors
+        setReportError("");
 
         try {
             await axios.post(`/reports/property/${id}`, {
@@ -197,18 +211,16 @@ const PropertyDetailsPage = () => {
                 setIsReportModalOpen(false);
                 setReportSuccess(false);
                 setReportComment("");
-                setReportError(""); // Reset error on close
+                setReportError("");
             }, 3000);
         } catch (err) {
             console.error(err);
-            // Smart Error Extraction: Pulls the exact message from Spring Boot!
             let errorMsg = "Failed to submit report. Please try again.";
             if (err.response && err.response.data) {
                 errorMsg = typeof err.response.data === 'string'
                     ? err.response.data
                     : err.response.data.message || errorMsg;
             }
-            // Set the error to show in the UI instead of an alert()
             setReportError(errorMsg);
         } finally {
             setIsSubmittingReport(false);
@@ -222,7 +234,6 @@ const PropertyDetailsPage = () => {
             {isReportModalOpen && (
                 <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-                        {/* Header */}
                         <div className="bg-red-50 p-6 flex items-start justify-between border-b border-red-100">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-red-100 rounded-full text-red-600">
@@ -233,16 +244,11 @@ const PropertyDetailsPage = () => {
                                     <p className="text-sm text-red-600 font-medium">Our Trust & Safety team will review this.</p>
                                 </div>
                             </div>
-                            <button onClick={() => {
-                                setReportError("");
-                                setIsReportModalOpen(false);
-                            }}
-                                    className="text-gray-400 hover:text-gray-600 transition">
+                            <button onClick={() => { setReportError(""); setIsReportModalOpen(false); }} className="text-gray-400 hover:text-gray-600 transition">
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
 
-                        {/* Body */}
                         {reportSuccess ? (
                             <div className="p-8 text-center space-y-3">
                                 <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -261,45 +267,20 @@ const PropertyDetailsPage = () => {
                                 )}
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-2">Reason for reporting</label>
-                                    <select
-                                        value={reportReason}
-                                        onChange={(e) => setReportReason(e.target.value)}
-                                        className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 font-medium outline-none"
-                                    >
+                                    <select value={reportReason} onChange={(e) => setReportReason(e.target.value)} className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 font-medium outline-none">
                                         <option value="FRAUD">Scam or Fraudulent Listing</option>
                                         <option value="INACCURATE">Inaccurate Information/Photos</option>
                                         <option value="INAPPROPRIATE">Inappropriate Content</option>
                                         <option value="SOLD_UNAVAILABLE">Property is already Sold/Rented</option>
                                     </select>
                                 </div>
-
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-2">Additional Comments (Optional)</label>
-                                    <textarea
-                                        rows="3"
-                                        value={reportComment}
-                                        onChange={(e) => setReportComment(e.target.value)}
-                                        placeholder="Please provide any extra details to help our team..."
-                                        className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 font-medium outline-none resize-none"
-                                    ></textarea>
+                                    <textarea rows="3" value={reportComment} onChange={(e) => setReportComment(e.target.value)} placeholder="Please provide any extra details to help our team..." className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 font-medium outline-none resize-none"></textarea>
                                 </div>
-
                                 <div className="flex gap-3 pt-4 border-t border-gray-100">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setReportError("");
-                                            setIsReportModalOpen(false);
-                                        }}
-                                        className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={isSubmittingReport}
-                                        className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center"
-                                    >
+                                    <button type="button" onClick={() => { setReportError(""); setIsReportModalOpen(false); }} className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors">Cancel</button>
+                                    <button type="submit" disabled={isSubmittingReport} className="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center">
                                         {isSubmittingReport ? "Sending..." : "Submit Report"}
                                     </button>
                                 </div>
@@ -309,39 +290,53 @@ const PropertyDetailsPage = () => {
                 </div>
             )}
 
+            {/* --- FULLSCREEN GALLERY MODAL --- */}
             {isGalleryOpen && (
                 <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center backdrop-blur-sm animate-in fade-in duration-200">
-                    <button onClick={closeGallery} className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition"><X className="w-8 h-8" /></button>
-                    <button onClick={prevImage} className="absolute left-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition hidden md:block"><ChevronLeft className="w-8 h-8" /></button>
-                    <img src={images[currentImageIndex]} alt="Gallery" className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl" />
-                    <button onClick={nextImage} className="absolute right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition hidden md:block"><ChevronRight className="w-8 h-8" /></button>
+                    <button onClick={closeGallery} className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition z-50"><X className="w-8 h-8" /></button>
+                    <button onClick={prevImage} className="absolute left-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition hidden md:block z-50"><ChevronLeft className="w-8 h-8" /></button>
+
+                    {/* SMART RENDERER: Turns on sound/controls for full screen video */}
+                    <MediaRenderer
+                        src={images[currentImageIndex]}
+                        alt="Gallery"
+                        className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl"
+                        autoPlay={true}
+                        controls={true}
+                    />
+
+                    <button onClick={nextImage} className="absolute right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition hidden md:block z-50"><ChevronRight className="w-8 h-8" /></button>
                     <div className="absolute bottom-6 text-white font-medium bg-black/50 px-4 py-2 rounded-full">{currentImageIndex + 1} / {images.length}</div>
                 </div>
             )}
 
+            {/* --- HERO GRID SECTION --- */}
             <div className="max-w-7xl mx-auto px-4 py-6">
                 <div className="relative rounded-3xl overflow-hidden h-[400px] md:h-[500px] bg-gray-100">
-                    {/* Status Overlay Banner for Images */}
                     {!isActive && (
                         <div className="absolute top-6 left-6 z-10 bg-red-600 text-white px-6 py-2 rounded-full font-black text-xl shadow-2xl uppercase tracking-widest border-2 border-white/20 backdrop-blur-md">
                             {property.status}
                         </div>
                     )}
                     <div className={`grid h-full gap-2 ${images.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-4 grid-rows-2'} ${!isActive ? 'opacity-80 grayscale-[20%]' : ''}`}>
+
+                        {/* Main Image/Video */}
                         <div onClick={() => openGallery(0)} className={`relative cursor-pointer group overflow-hidden ${images.length === 1 ? 'col-span-1' : 'col-span-2 row-span-2'}`}>
-                            <img src={images[0]} className="w-full h-full object-cover transition duration-500 group-hover:scale-105" alt="Main" />
+                            <MediaRenderer src={images[0]} alt="Main" className="w-full h-full object-cover transition duration-500 group-hover:scale-105" />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition"></div>
                         </div>
+
+                        {/* Sub Images/Videos */}
                         {images.slice(1, 5).map((img, idx) => (
                             <div key={idx} onClick={() => openGallery(idx + 1)} className="hidden md:block relative cursor-pointer group overflow-hidden">
-                                <img src={img} className="w-full h-full object-cover transition duration-500 group-hover:scale-105" alt={`Sub ${idx}`} />
+                                <MediaRenderer src={img} alt={`Sub ${idx}`} className="w-full h-full object-cover transition duration-500 group-hover:scale-105" />
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition"></div>
                             </div>
                         ))}
                     </div>
                     {images.length > 5 && (
-                        <button onClick={() => openGallery(0)} className="absolute bottom-6 right-6 bg-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg flex items-center gap-2 hover:scale-105 transition">
-                            <Grid className="w-4 h-4" /> Show all {images.length} photos
+                        <button onClick={() => openGallery(0)} className="absolute bottom-6 right-6 bg-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg flex items-center gap-2 hover:scale-105 transition z-10">
+                            <Grid className="w-4 h-4" /> Show all {images.length} media
                         </button>
                     )}
                 </div>
@@ -404,12 +399,8 @@ const PropertyDetailsPage = () => {
                             </div>
                         </div>
 
-                        {/* --- DYNAMIC UI DECISION TREE --- */}
                         {currentUser && currentUser.userId === property.ownerId ? (
-                            /* --- I AM THE OWNER --- */
                             <div className="space-y-3">
-
-                                {/* 1. DYNAMIC WARNING BANNER */}
                                 {property.status === 'SUSPENDED' ? (
                                     <div className="bg-orange-50 text-orange-800 text-sm px-5 py-4 rounded-xl mb-4 border border-orange-200 flex items-start gap-3">
                                         <ShieldAlert className="w-6 h-6 shrink-0 mt-0.5" />
@@ -426,7 +417,6 @@ const PropertyDetailsPage = () => {
                                     </div>
                                 )}
 
-                                {/* 2. THE RESTORED STATUS BUTTONS (Hidden if Suspended) */}
                                 {property.status !== 'SUSPENDED' && (
                                     isActive ? (
                                         <button onClick={() => handleStatusChange(soldOrRentedText)} className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-200">
@@ -439,7 +429,6 @@ const PropertyDetailsPage = () => {
                                     )
                                 )}
 
-                                {/* 3. EDIT / DELETE BUTTONS */}
                                 <div className="grid grid-cols-2 gap-3 pt-2">
                                     <button onClick={handleEdit} className="w-full py-3 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold rounded-xl flex items-center justify-center gap-2 transition-all border border-blue-100">
                                         <Edit className="w-4 h-4" /> Edit
@@ -450,14 +439,12 @@ const PropertyDetailsPage = () => {
                                 </div>
                             </div>
                         ) : (
-                            /* --- I AM A VISITOR --- */
                             isActive ? (
                                 <div className="space-y-3">
                                     <button onClick={() => setShowPhone(!showPhone)} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-200">
                                         <Phone className="w-5 h-5" /> {showPhone ? property.ownerPhone : "Show Phone Number"}
                                     </button>
 
-                                    {/* MUTE MESSAGES CHECK */}
                                     {currentUser && (currentUser.banStatus === 'MUTE_MESSAGES' || currentUser.banStatus === 'BANNED') ? (
                                         <div className="w-full py-4 bg-gray-100 border-2 border-gray-200 text-gray-400 font-bold rounded-xl flex items-center justify-center gap-2 cursor-not-allowed">
                                             <ShieldAlert className="w-5 h-5" /> Messaging Restricted
@@ -482,16 +469,9 @@ const PropertyDetailsPage = () => {
                                 <Share2 className="w-4 h-4" /> Share this property
                             </button>
                         </div>
-                        {/* Only show Report button to visitors, not the owner */}
                         {!(currentUser && currentUser.userId === property.ownerId) && (
                             <div className="mt-4 pt-4 border-t border-gray-100 text-center">
-                                <button
-                                    onClick={() => {
-                                        if(!localStorage.getItem("token")) { navigate("/login"); return; }
-                                        setIsReportModalOpen(true);
-                                    }}
-                                    className="text-xs font-bold text-gray-400 hover:text-red-600 flex items-center justify-center gap-1 w-full transition-colors"
-                                >
+                                <button onClick={() => { if(!localStorage.getItem("token")) { navigate("/login"); return; } setIsReportModalOpen(true); }} className="text-xs font-bold text-gray-400 hover:text-red-600 flex items-center justify-center gap-1 w-full transition-colors">
                                     <Flag className="w-3 h-3" /> Report this listing
                                 </button>
                             </div>

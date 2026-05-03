@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapPin, BedDouble, Bath, Square, Heart, CheckCircle } from "lucide-react"; // Added CheckCircle
+import { MapPin, BedDouble, Bath, Square, Heart, CheckCircle, PlayCircle, Crown } from "lucide-react";
 import axios from "../api/axios";
 
-// Accept new prop: onFavoriteToggle
 const SearchResultCard = ({ property, isFavorited = null, onFavoriteToggle }) => {
     const navigate = useNavigate();
 
@@ -26,6 +25,9 @@ const SearchResultCard = ({ property, isFavorited = null, onFavoriteToggle }) =>
         ? `http://localhost:8080/uploads/${property.imageUrls[0]}`
         : "https://images.unsplash.com/photo-1600596542815-2495db98dada?auto=format&fit=crop&q=80&w=800";
 
+    // --- SMART THUMBNAIL LOGIC ---
+    const isVideoThumbnail = mainImage.endsWith('.mp4') || mainImage.endsWith('.webm');
+
     const toggleFavorite = async (e) => {
         e.stopPropagation();
         const token = localStorage.getItem("token");
@@ -43,7 +45,6 @@ const SearchResultCard = ({ property, isFavorited = null, onFavoriteToggle }) =>
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            // NOTIFY THE PARENT (ProfilePage)
             if (onFavoriteToggle) {
                 onFavoriteToggle(property.propertyId, newState);
             }
@@ -54,27 +55,60 @@ const SearchResultCard = ({ property, isFavorited = null, onFavoriteToggle }) =>
         }
     };
 
-    // GP2: Helper to check if property is off market
     const isActive = !property.status || property.status === 'ACTIVE';
+
+    // Phase 4 Hook: If the property owner is premium, highlight the card!
+    const isPremiumListing = property.isPremium;
 
     return (
         <div
             onClick={() => navigate(`/properties/${property.propertyId}`)}
-            // Apply grayscale and slight opacity if it's Sold/Rented to push attention to Active ones
-            className={`bg-white border border-gray-100 rounded-2xl p-3 flex flex-col md:flex-row gap-4 hover:shadow-lg transition-all cursor-pointer group mb-4 relative ${!isActive ? 'opacity-80 grayscale-[40%]' : ''}`}
+            className={`bg-white rounded-2xl p-3 flex flex-col md:flex-row gap-4 transition-all cursor-pointer group mb-4 relative
+                ${!isActive ? 'opacity-80 grayscale-[40%]' : ''} 
+                ${isPremiumListing
+                ? 'border-2 border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.2)] hover:shadow-[0_0_25px_rgba(250,204,21,0.4)]'
+                : 'border border-gray-100 hover:shadow-lg'
+            }
+            `}
         >
-            {/* Left: Image */}
-            <div className="w-full md:w-64 h-48 md:h-auto flex-shrink-0 relative rounded-xl overflow-hidden">
-                <img src={mainImage} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+            {/* Left: Image / Video Thumbnail */}
+            {/* FIXED HEIGHT/WIDTH: md:h-48 md:w-64 ensures all cards are exactly the same size regardless of photo ratio */}
+            <div className="w-full h-48 md:w-64 md:h-48 flex-shrink-0 relative rounded-xl overflow-hidden bg-gray-100">
 
-                {/* ONLY SHOW SALE/RENT IF ACTIVE */}
+                {/* --- SMART THUMBNAIL RENDERER --- */}
+                {isVideoThumbnail ? (
+                    <div className="relative w-full h-full">
+                        {/* The #t=0.1 trick forces the browser to load the first frame as an image! */}
+                        <video
+                            src={`${mainImage}#t=0.1`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            muted
+                            playsInline
+                            preload="metadata"
+                        />
+                        {/* Play button overlay to show it's a video tour */}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors">
+                            <PlayCircle className="w-12 h-12 text-white/90 drop-shadow-lg scale-90 group-hover:scale-100 transition-transform" />
+                        </div>
+                    </div>
+                ) : (
+                    <img src={mainImage} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                )}
+
+                {/* VIP Badge */}
+                {isPremiumListing && (
+                    <div className="absolute top-2 right-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-lg flex items-center gap-1 z-10 uppercase tracking-widest">
+                        <Crown className="w-3 h-3" /> VIP
+                    </div>
+                )}
+
+                {/* Sale/Rent Badges */}
                 {isActive && (
                     <div className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded uppercase shadow-md z-10">
                         {property.purpose === 'BUY' ? 'Sale' : 'Rent'}
                     </div>
                 )}
 
-                {/* IF NOT ACTIVE, SHOW THE EXACT STATUS (SOLD, RENTED, OR SUSPENDED) */}
                 {!isActive && (
                     <div className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded uppercase shadow-md flex items-center gap-1 z-10">
                         <CheckCircle className="w-3 h-3" /> {property.status}
@@ -90,7 +124,6 @@ const SearchResultCard = ({ property, isFavorited = null, onFavoriteToggle }) =>
                             <span className="text-xs font-bold text-blue-600 uppercase tracking-wide">{property.type}</span>
                         </div>
 
-                        {/* Hide the favorite button if the property is sold and the user isn't the owner */}
                         {isActive && (
                             <button
                                 onClick={toggleFavorite}

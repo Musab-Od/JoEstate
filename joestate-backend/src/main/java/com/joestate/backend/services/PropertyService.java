@@ -51,7 +51,7 @@ public class PropertyService {
 
     public List<PropertyDTO> getFeaturedProperties() {
         Set<Long> likedIds = getLikedPropertyIds();
-        List<Property> props = propertyRepository.findTop3ByStatusOrderByDatePostedDesc(Property.Status.ACTIVE);
+        List<Property> props = propertyRepository.findTop6ByStatusOrderByDatePostedDesc(Property.Status.ACTIVE);
         return props.stream().map(p -> mapToDTO(p, likedIds)).collect(Collectors.toList());
     }
 
@@ -324,7 +324,7 @@ public class PropertyService {
                 .build();
     }
 
-    // Helper: Save Images to Disk & DB
+    // Helper: Save Media to Disk & DB
     private void saveImages(List<MultipartFile> files, Property property) {
         if (files == null || files.isEmpty()) return;
 
@@ -336,18 +336,36 @@ public class PropertyService {
             for (MultipartFile file : files) {
                 if (file.isEmpty()) continue;
 
-                String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+                String originalFilename = file.getOriginalFilename();
+                if (originalFilename == null) continue;
+
+                // --- SECURITY CHECK: Only allow safe extensions ---
+                String lowerName = originalFilename.toLowerCase();
+                if (!lowerName.endsWith(".jpg") && !lowerName.endsWith(".jpeg") &&
+                        !lowerName.endsWith(".png") && !lowerName.endsWith(".webp") &&
+                        !lowerName.endsWith(".mp4") && !lowerName.endsWith(".webm")) {
+                    throw new RuntimeException("Invalid file type uploaded. Only Images and MP4/WebM videos are allowed.");
+                }
+
+                String fileName = UUID.randomUUID().toString() + "_" + originalFilename;
                 Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
 
                 PropertyImage image = new PropertyImage();
                 image.setProperty(property);
                 image.setImageUrl(fileName);
-                image.setMain(isMain);
+
+                // Allow the first file to be the main media, even if it's a video!
+                if (isMain) {
+                    image.setMain(true);
+                    isMain = false;
+                } else {
+                    image.setMain(false);
+                }
+
                 propertyImageRepository.save(image);
-                isMain = false;
             }
         } catch (IOException e) {
-            throw new RuntimeException("Failed to upload images", e);
+            throw new RuntimeException("Failed to upload media files", e);
         }
     }
 }

@@ -11,27 +11,19 @@ const AddPropertyPage = () => {
 
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
-
     const [isPremium, setIsPremium] = useState(false);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
     const [formData, setFormData] = useState({
-        title: "",
-        description: "",
-        price: "",
-        area: "",
-        location: "",
-        roomCount: "",
-        bathCount: "",
-        type: "APARTMENT",
-        purpose: "RENT",
-        rentFrequency: "MONTHLY",
+        title: "", description: "", price: "", area: "", location: "",
+        roomCount: "", bathCount: "", type: "APARTMENT", purpose: "RENT", rentFrequency: "MONTHLY",
     });
 
     const [images, setImages] = useState([]);
+
+    // PREVIEWS will now hold objects: { url: string, type: string }
     const [previews, setPreviews] = useState([]);
 
-    // GP2: FETCH DATA IF EDITING
     useEffect(() => {
         if (isEditMode) {
             setIsLoading(true);
@@ -39,20 +31,18 @@ const AddPropertyPage = () => {
                 .then(res => {
                     const data = res.data;
                     setFormData({
-                        title: data.title,
-                        description: data.description,
-                        price: data.price.toString(),
-                        area: data.area.toString(),
-                        location: data.location,
-                        roomCount: data.roomCount.toString(),
-                        bathCount: data.bathCount.toString(),
-                        type: data.type,
-                        purpose: data.purpose,
+                        title: data.title, description: data.description, price: data.price.toString(),
+                        area: data.area.toString(), location: data.location, roomCount: data.roomCount.toString(),
+                        bathCount: data.bathCount.toString(), type: data.type, purpose: data.purpose,
                         rentFrequency: data.rentFrequency || "NONE",
                     });
 
                     if (data.imageUrls) {
-                        setPreviews(data.imageUrls.map(url => `http://localhost:8080/uploads/${url}`));
+                        // FIXED: Mark old files as video or image based on extension
+                        setPreviews(data.imageUrls.map(url => ({
+                            url: `http://localhost:8080/uploads/${url}`,
+                            type: url.endsWith('.mp4') || url.endsWith('.webm') ? 'video/mp4' : 'image/jpeg'
+                        })));
                     }
                 })
                 .catch(err => setError("Failed to load property data."))
@@ -66,20 +56,14 @@ const AddPropertyPage = () => {
     const isLand = landTypes.includes(formData.type);
 
     useEffect(() => {
-        if (formData.type === "STUDIO") {
-            setFormData((prev) => ({ ...prev, roomCount: "1", bathCount: "1" }));
-        }
+        if (formData.type === "STUDIO") setFormData((prev) => ({ ...prev, roomCount: "1", bathCount: "1" }));
     }, [formData.type]);
 
     useEffect(() => {
-        if (formData.purpose === "BUY") {
-            setFormData((prev) => ({ ...prev, rentFrequency: "NONE" }));
-        } else if (formData.purpose === "RENT" && formData.rentFrequency === "NONE") {
-            setFormData((prev) => ({ ...prev, rentFrequency: "MONTHLY" }));
-        }
+        if (formData.purpose === "BUY") setFormData((prev) => ({ ...prev, rentFrequency: "NONE" }));
+        else if (formData.purpose === "RENT" && formData.rentFrequency === "NONE") setFormData((prev) => ({ ...prev, rentFrequency: "MONTHLY" }));
     }, [formData.purpose]);
 
-    // Fetch premium status on load
     useEffect(() => {
         const token = localStorage.getItem("token");
         if (token) {
@@ -93,9 +77,7 @@ const AddPropertyPage = () => {
         const { name, value } = e.target;
         if (name === "price" || name === "area") {
             const rawValue = value.replace(/,/g, "");
-            if (!isNaN(rawValue) && Number(rawValue) >= 0) {
-                setFormData({ ...formData, [name]: rawValue });
-            }
+            if (!isNaN(rawValue) && Number(rawValue) >= 0) setFormData({ ...formData, [name]: rawValue });
         } else {
             setFormData({ ...formData, [name]: value });
         }
@@ -107,37 +89,42 @@ const AddPropertyPage = () => {
         if (!e.target.files) return;
         const files = Array.from(e.target.files);
 
-        // ENFORCE LIMIT FOR FREE USERS
-        if (!isPremium && previews.length + files.length > 10) {
-            setIsCheckoutOpen(true); // Pop the modal immediately!
+        const hasVideo = files.some(file => file.type.startsWith("video/"));
+        if (!isPremium && hasVideo) {
+            setIsCheckoutOpen(true);
             return;
         }
 
-        // ENFORCE PREMIUM LIMIT (Just to be safe on the server)
+        if (!isPremium && previews.length + files.length > 10) {
+            setIsCheckoutOpen(true);
+            return;
+        }
+
         if (isPremium && previews.length + files.length > 50) {
-            alert("Maximum 50 photos allowed even for premium users.");
+            alert("Maximum 50 media files allowed.");
             return;
         }
 
         setImages((prev) => [...prev, ...files]);
-        const newPreviews = files.map((file) => URL.createObjectURL(file));
+
+        // FIXED: Save the URL AND the actual file type so the browser knows it's a video!
+        const newPreviews = files.map((file) => ({
+            url: URL.createObjectURL(file),
+            type: file.type
+        }));
         setPreviews((prev) => [...prev, ...newPreviews]);
     };
 
-    // FIXED: Smart Remove Logic to handle old vs new arrays safely
     const removeImage = (indexToRemove) => {
-        const previewUrl = previews[indexToRemove];
+        const previewObj = previews[indexToRemove];
 
-        // If it's a NEW file (starts with blob:), we must remove it from the 'images' array too
-        if (previewUrl.startsWith("blob:")) {
+        if (previewObj.url.startsWith("blob:")) {
             let blobCount = 0;
             for (let i = 0; i < indexToRemove; i++) {
-                if (previews[i].startsWith("blob:")) blobCount++;
+                if (previews[i].url.startsWith("blob:")) blobCount++;
             }
             setImages(images.filter((_, i) => i !== blobCount));
         }
-
-        // Always remove from previews
         setPreviews(previews.filter((_, i) => i !== indexToRemove));
     };
 
@@ -146,7 +133,6 @@ const AddPropertyPage = () => {
         setIsLoading(true);
         setError("");
 
-        // FIXED: Universal validation - blocks if total photos (old + new) is 0
         if (previews.length === 0) {
             alert("Please include at least one photo of the property.");
             setIsLoading(false);
@@ -178,18 +164,15 @@ const AddPropertyPage = () => {
                 data.append("bathCount", "0");
             }
 
-            if (formData.purpose === "RENT") {
-                data.append("rentFrequency", formData.rentFrequency);
-            }
+            if (formData.purpose === "RENT") data.append("rentFrequency", formData.rentFrequency);
 
-            // FIXED: Send the list of OLD images we want to KEEP
+            // FIXED: Extract URL from the object safely
             const keptImages = previews
-                .filter(url => url.startsWith("http://localhost:8080/uploads/"))
-                .map(url => url.replace("http://localhost:8080/uploads/", ""));
+                .filter(p => p.url.startsWith("http://localhost:8080/uploads/"))
+                .map(p => p.url.replace("http://localhost:8080/uploads/", ""));
 
             keptImages.forEach(name => data.append("existingImageUrls", name));
 
-            // Append the NEW files
             if (images.length > 0) {
                 images.forEach((file) => data.append("imageFiles", file));
             }
@@ -207,7 +190,6 @@ const AddPropertyPage = () => {
                 alert("Property Listed Successfully!");
                 navigate("/");
             }
-
         } catch (err) {
             console.error(err);
             setError("Failed to publish listing.");
@@ -357,13 +339,12 @@ const AddPropertyPage = () => {
 
                         <div className="space-y-6">
                             <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                                <FileText className="w-5 h-5 text-blue-600" /> Photos
+                                <FileText className="w-5 h-5 text-blue-600" /> Photos & Videos
                                 <span className="text-sm font-semibold text-gray-500 ml-2">
                                     ({previews.length}/{isPremium ? '50' : '10'} selected)
                                 </span>
                             </h3>
 
-                            {/* --- CONTEXTUAL UPSELL BANNER --- */}
                             {!isPremium && (
                                 <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
                                     <div className="flex items-center gap-3">
@@ -382,7 +363,13 @@ const AddPropertyPage = () => {
                             )}
 
                             <div className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer relative group">
-                                <input type="file" multiple accept="image/*" onChange={handleImageChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                <input
+                                    type="file"
+                                    multiple
+                                    accept={isPremium ? "image/*, video/mp4, video/webm" : "image/*"}
+                                    onChange={handleImageChange}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                />
                                 <div className="flex flex-col items-center justify-center space-y-3">
                                     <div className="bg-blue-100 p-4 rounded-full group-hover:scale-110 transition-transform">
                                         <Upload className="w-8 h-8 text-blue-600" />
@@ -390,15 +377,22 @@ const AddPropertyPage = () => {
                                     <div className="text-gray-600">
                                         <span className="font-semibold text-blue-600">Click to upload</span> or drag and drop
                                     </div>
-                                    <p className="text-xs text-gray-400">PNG, JPG up to 10MB each</p>
+                                    <p className="text-xs text-gray-400">PNG, JPG up to 10MB each. {isPremium && "MP4 allowed."}</p>
                                 </div>
                             </div>
 
                             {previews.length > 0 && (
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
-                                    {previews.map((src, index) => (
+                                    {previews.map((item, index) => (
                                         <div key={index} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
-                                            <img src={src} alt="Preview" className="w-full h-full object-cover" />
+
+                                            {/* FIXED: The Smart Renderer checks the type property we created */}
+                                            {item.type && item.type.startsWith("video/") ? (
+                                                <video src={item.url} autoPlay loop muted className="w-full h-full object-cover" />
+                                            ) : (
+                                                <img src={item.url} alt="Preview" className="w-full h-full object-cover" />
+                                            )}
+
                                             <button type="button" onClick={() => removeImage(index)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600">
                                                 <X className="w-3 h-3" />
                                             </button>
@@ -414,16 +408,7 @@ const AddPropertyPage = () => {
                     </form>
                 </div>
             </div>
-            {/* The Premium Checkout Modal */}
-            <PremiumCheckoutModal
-                isOpen={isCheckoutOpen}
-                onClose={() => setIsCheckoutOpen(false)}
-                onSuccess={() => {
-                    setIsCheckoutOpen(false);
-                    setIsPremium(true); // Instantly unlock the UI!
-                    alert("Success! You can now upload up to 50 photos.");
-                }}
-            />
+            <PremiumCheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} onSuccess={() => { setIsCheckoutOpen(false); setIsPremium(true); alert("Success! You can now upload up to 50 photos and videos."); }} />
         </div>
     );
 };

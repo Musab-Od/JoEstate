@@ -38,7 +38,7 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
     @Query("SELECT DISTINCT p.location FROM Property p WHERE LOWER(p.location) LIKE LOWER(CONCAT('%', :query, '%'))")
     List<String> findDistinctLocations(@Param("query") String query);
 
-    List<Property> findTop3ByStatusOrderByDatePostedDesc(Property.Status status);
+    List<Property> findTop6ByStatusOrderByDatePostedDesc(Property.Status status);
 
     List<Property> findAllByOwner_Email(String email); // Finds all houses owned by this user
 
