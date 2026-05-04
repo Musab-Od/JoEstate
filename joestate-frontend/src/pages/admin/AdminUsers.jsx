@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "../../api/axios";
-import { Search, Users, Shield, Ban, CheckCircle, ExternalLink, ChevronDown, ChevronUp, Home, ShieldAlert, Tag, Key, MessageSquare, Edit3, Flag } from "lucide-react";
+import { Search, Users, Shield, Ban, CheckCircle, ExternalLink, ChevronDown, ChevronUp, Home, ShieldAlert, Tag, Key, MessageSquare, Edit3, Flag, Crown, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const AdminUsers = () => {
@@ -10,9 +10,8 @@ const AdminUsers = () => {
     const [suspendedProps, setSuspendedProps] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // ACCORDION STATE
     const [expandedUserId, setExpandedUserId] = useState(null);
-    const [accordionSubTab, setAccordionSubTab] = useState("PROPERTIES"); // PROPERTIES or REPORTS
+    const [accordionSubTab, setAccordionSubTab] = useState("PROPERTIES");
     const [userProperties, setUserProperties] = useState({});
     const [userReports, setUserReports] = useState({});
     const [loadingAccordionData, setLoadingAccordionData] = useState(false);
@@ -30,6 +29,8 @@ const AdminUsers = () => {
                 const res = await axios.get(`/admin/users/search?query=${searchTerm}`, { headers: { Authorization: `Bearer ${token}` } });
                 if (activeTab === "RESTRICTED_USERS") {
                     setData(res.data.filter(u => u.banStatus !== 'NONE'));
+                } else if (activeTab === "VIP_SUBSCRIBERS") {
+                    setData(res.data.filter(u => u.isPremium));
                 } else {
                     setData(res.data);
                 }
@@ -46,22 +47,14 @@ const AdminUsers = () => {
         return () => clearTimeout(delayDebounceFn);
     }, [searchTerm, activeTab]);
 
-    // --- GRANULAR BAN STATUS WITH AUDIT TRAIL ---
     const handleBanStatusChange = async (userId, newStatus) => {
-        // Force the admin to write an audit note!
         const auditNote = window.prompt(`You are changing this user's restriction to: ${newStatus}.\n\nPlease enter the mandatory audit note for the Archives:`);
-
-        if (auditNote === null) return; // Admin clicked Cancel
-        if (auditNote.trim() === "") {
-            alert("Action aborted. An audit note is mandatory.");
-            return;
-        }
+        if (auditNote === null) return;
+        if (auditNote.trim() === "") return alert("Action aborted. An audit note is mandatory.");
 
         const token = localStorage.getItem("token");
         try {
-            // Send the status AND the notes to the backend
             await axios.put(`/admin/users/${userId}/ban?status=${newStatus}&notes=${encodeURIComponent(auditNote)}`, {}, { headers: { Authorization: `Bearer ${token}` } });
-
             setData(data.map(u => u.userId === userId ? { ...u, banStatus: newStatus } : u));
             if (activeTab === "RESTRICTED_USERS" && newStatus === 'NONE') {
                 setData(prev => prev.filter(u => u.userId !== userId));
@@ -72,26 +65,19 @@ const AdminUsers = () => {
         }
     };
 
-    // --- ACCORDION HANDLER ---
     const toggleUserRow = async (userId) => {
-        if (expandedUserId === userId) {
-            setExpandedUserId(null);
-            return;
-        }
-
+        if (expandedUserId === userId) { setExpandedUserId(null); return; }
         setExpandedUserId(userId);
-        setAccordionSubTab("PROPERTIES"); // Default to properties
+        setAccordionSubTab("PROPERTIES");
 
         if (!userProperties[userId] || !userReports[userId]) {
             setLoadingAccordionData(true);
             const token = localStorage.getItem("token");
             try {
-                // Fetch both properties AND reports concurrently!
                 const [propsRes, reportsRes] = await Promise.all([
                     axios.get(`/admin/users/${userId}/properties`, { headers: { Authorization: `Bearer ${token}` } }),
                     axios.get(`/admin/users/${userId}/reports`, { headers: { Authorization: `Bearer ${token}` } })
                 ]);
-
                 setUserProperties(prev => ({ ...prev, [userId]: propsRes.data }));
                 setUserReports(prev => ({ ...prev, [userId]: reportsRes.data }));
             } catch (err) {
@@ -104,21 +90,13 @@ const AdminUsers = () => {
 
     const handleSuspendProperty = async (propertyId, currentStatus, userId = null) => {
         const action = currentStatus === 'SUSPENDED' ? 'Reactivate' : 'Suspend';
-
-        // 1. Force the admin to write an audit note!
         const auditNote = window.prompt(`You are about to ${action.toLowerCase()} this property.\n\nPlease enter the mandatory audit note for the Archives:`);
-
-        if (auditNote === null) return; // Admin clicked Cancel
-        if (auditNote.trim() === "") {
-            alert("Action aborted. An audit note is mandatory.");
-            return;
-        }
+        if (auditNote === null) return;
+        if (auditNote.trim() === "") return alert("Action aborted. An audit note is mandatory.");
 
         const token = localStorage.getItem("token");
         try {
-            // 2. Send the property toggle command WITH the notes
             await axios.put(`/admin/properties/${propertyId}/suspend-toggle?notes=${encodeURIComponent(auditNote)}`, {}, { headers: { Authorization: `Bearer ${token}` } });
-
             const newStatus = currentStatus === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
 
             if (userId && userProperties[userId]) {
@@ -126,11 +104,9 @@ const AdminUsers = () => {
                     ...prev, [userId]: prev[userId].map(p => p.propertyId === propertyId ? { ...p, status: newStatus } : p)
                 }));
             }
-
             if (activeTab === "SUSPENDED_PROPERTIES") {
                 setSuspendedProps(prev => prev.filter(p => p.propertyId !== propertyId));
             }
-
             alert("Action executed and saved to Resolved Archives.");
         } catch (err) {
             alert("Failed to update property status.");
@@ -161,7 +137,7 @@ const AdminUsers = () => {
                 {activeTab !== "SUSPENDED_PROPERTIES" && (
                     <div className="relative w-full md:w-96">
                         <input
-                            type="text" placeholder="Search users by name or email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                            type="text" placeholder="Search users..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
                         />
                         <Search className="w-5 h-5 text-slate-400 absolute left-3 top-3.5" />
@@ -169,9 +145,12 @@ const AdminUsers = () => {
                 )}
             </div>
 
-            <div className="flex flex-wrap space-x-1 bg-slate-200/50 p-1 rounded-xl w-full max-w-2xl mb-8">
+            <div className="flex flex-wrap space-x-1 bg-slate-200/50 p-1 rounded-xl w-full max-w-4xl mb-8">
                 <button onClick={() => setActiveTab("ALL_USERS")} className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold text-sm transition-all ${activeTab === "ALL_USERS" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200"}`}>
                     <Users className="w-4 h-4" /> Users Directory
+                </button>
+                <button onClick={() => setActiveTab("VIP_SUBSCRIBERS")} className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold text-sm transition-all ${activeTab === "VIP_SUBSCRIBERS" ? "bg-white text-yellow-600 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200"}`}>
+                    <Crown className="w-4 h-4" /> VIP Subscribers
                 </button>
                 <button onClick={() => setActiveTab("RESTRICTED_USERS")} className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold text-sm transition-all ${activeTab === "RESTRICTED_USERS" ? "bg-white text-orange-600 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200"}`}>
                     <ShieldAlert className="w-4 h-4" /> Restricted Accounts
@@ -184,7 +163,6 @@ const AdminUsers = () => {
             {loading ? (
                 <div className="p-10 font-bold text-slate-400 text-center animate-pulse">Scanning database...</div>
             ) : activeTab === "SUSPENDED_PROPERTIES" ? (
-                /* --- SUSPENDED PROPERTIES --- */
                 suspendedProps.length === 0 ? (
                     <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-10 text-center text-slate-400 font-bold">No suspended properties found.</div>
                 ) : (
@@ -219,6 +197,7 @@ const AdminUsers = () => {
                             <th className="p-4 font-bold">User Identity</th>
                             <th className="p-4 font-bold">Contact</th>
                             <th className="p-4 font-bold">Account Status</th>
+                            <th className="p-4 font-bold">Member Since</th>
                             <th className="p-4 font-bold text-right">Adjust Restriction</th>
                         </tr>
                         </thead>
@@ -232,13 +211,20 @@ const AdminUsers = () => {
                                         </button>
                                     </td>
                                     <td className="p-4">
-                                        <div className="font-bold text-slate-900 flex items-center gap-1">
+                                        <div className="font-bold text-slate-900 flex items-center gap-2">
                                             <Link to={`/user/${user.userId}`} target="_blank" className="hover:text-blue-600 transition">{user.firstName} {user.lastName}</Link>
+                                            {user.isPremium && <Crown className="w-4 h-4 text-yellow-500" title="Premium Subscriber" />}
                                             {user.role === 'ADMIN' && <Shield className="w-3 h-3 text-red-600" title="Admin" />}
                                         </div>
                                     </td>
                                     <td className="p-4 text-sm text-slate-600">{user.email}</td>
                                     <td className="p-4">{renderUserStatusBadge(user.banStatus)}</td>
+                                    <td className="p-4">
+                                        <div className="text-sm font-medium text-slate-600 flex items-center gap-1.5">
+                                            <Calendar className="w-3 h-3 text-slate-400" />
+                                            {new Date(user.createdAt).toLocaleDateString('en-GB')}
+                                        </div>
+                                    </td>
                                     <td className="p-4 text-right">
                                         {user.role !== 'ADMIN' && (
                                             <select
@@ -259,20 +245,12 @@ const AdminUsers = () => {
                                 {/* ACCORDION CONTENT */}
                                 {expandedUserId === user.userId && (
                                     <tr className="bg-slate-50 shadow-inner">
-                                        <td colSpan="5" className="p-6 border-b border-slate-200">
-
-                                            {/* Sub-Tab Navigation inside Accordion */}
+                                        <td colSpan="6" className="p-6 border-b border-slate-200">
                                             <div className="flex gap-2 mb-6 border-b border-slate-200 pb-2">
-                                                <button
-                                                    onClick={() => setAccordionSubTab("PROPERTIES")}
-                                                    className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${accordionSubTab === "PROPERTIES" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-800"}`}
-                                                >
+                                                <button onClick={() => setAccordionSubTab("PROPERTIES")} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${accordionSubTab === "PROPERTIES" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-800"}`}>
                                                     <Home className="w-4 h-4" /> Published Listings ({userProperties[user.userId]?.length || 0})
                                                 </button>
-                                                <button
-                                                    onClick={() => setAccordionSubTab("REPORTS")}
-                                                    className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${accordionSubTab === "REPORTS" ? "bg-white text-purple-600 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-800"}`}
-                                                >
+                                                <button onClick={() => setAccordionSubTab("REPORTS")} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${accordionSubTab === "REPORTS" ? "bg-white text-purple-600 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-800"}`}>
                                                     <Flag className="w-4 h-4" /> Report History ({userReports[user.userId]?.length || 0})
                                                 </button>
                                             </div>
@@ -280,7 +258,6 @@ const AdminUsers = () => {
                                             {loadingAccordionData ? (
                                                 <div className="text-slate-400 text-sm font-bold animate-pulse">Fetching user data...</div>
                                             ) : accordionSubTab === "PROPERTIES" ? (
-                                                /* RENDER PROPERTIES */
                                                 !userProperties[user.userId] || userProperties[user.userId].length === 0 ? (
                                                     <div className="text-slate-500 text-sm italic">This user has no properties.</div>
                                                 ) : (
@@ -312,15 +289,12 @@ const AdminUsers = () => {
                                                     </div>
                                                 )
                                             ) : (
-                                                /* RENDER REPORT HISTORY */
                                                 !userReports[user.userId] || userReports[user.userId].length === 0 ? (
                                                     <div className="text-slate-500 text-sm italic">No reports associated with this user.</div>
                                                 ) : (
                                                     <div className="space-y-3">
                                                         {userReports[user.userId].map(report => {
-                                                            // Determine if the user is the Reporter or the one who got Reported
                                                             const isReporter = report.reporterEmail === user.email;
-
                                                             return (
                                                                 <div key={report.reportId} className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                                                                     <div>

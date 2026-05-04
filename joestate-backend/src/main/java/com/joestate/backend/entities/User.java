@@ -36,6 +36,9 @@ public class User {
     @Column(nullable = false)
     private boolean isPremium = false;
 
+    @Column(name = "enterprise_name")
+    private String enterpriseName;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

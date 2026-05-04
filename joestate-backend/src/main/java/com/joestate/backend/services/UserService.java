@@ -2,10 +2,13 @@ package com.joestate.backend.services;
 
 import com.joestate.backend.dto.UserDTO;
 import com.joestate.backend.dto.PaymentRequest;
+import com.joestate.backend.dto.VerificationRequestDTO;
 import com.joestate.backend.entities.User;
 import com.joestate.backend.entities.Subscription;
+import com.joestate.backend.entities.VerificationRequest;
 import com.joestate.backend.repositories.UserRepository;
 import com.joestate.backend.repositories.SubscriptionRepository;
+import com.joestate.backend.repositories.VerificationRequestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +28,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final VerificationRequestRepository verificationRequestRepository;
 
     // Directory where uploads are stored
     private final String UPLOAD_DIR = "uploads/";
@@ -60,9 +64,6 @@ public class UserService {
         user.setPhoneNumber(dto.getPhoneNumber());
         user.setBio(dto.getBio());
 
-        // We don't need to explicitly call repository.save(user) here!
-        // Because of @Transactional, Spring detects the changes to the 'user' entity
-        // and automatically pushes them to the database when the method finishes.
         return mapToDTO(user);
     }
 
@@ -91,8 +92,6 @@ public class UserService {
         if ("4242424242424242".equals(cleanCard)) {
 
             // --- THE NEW ENTERPRISE LOGIC ---
-
-            // A. Create the official Subscription Record
             Subscription subscription = new Subscription();
             subscription.setUser(user);
             subscription.setType(Subscription.SubscriptionType.PREMIUM);
@@ -107,8 +106,6 @@ public class UserService {
 
             // B. Update the fast-access boolean flag on the User
             user.setPremium(true);
-
-            // (Because of @Transactional, 'user' is automatically saved here)
 
         } else {
             throw new RuntimeException("Card Declined. Insufficient funds or invalid card number.");
@@ -129,26 +126,71 @@ public class UserService {
         Path filePath = Paths.get(UPLOAD_DIR + newFileName);
 
         try {
-            // 1. Write to the File System FIRST
             Files.createDirectories(filePath.getParent());
             Files.write(filePath, file.getBytes());
 
-            // 2. Update the Database SECOND
             user.setProfilePictureUrl(newFileName);
 
-            // If anything fails after this point, Spring will roll back the database automatically.
             return newFileName;
 
         } catch (Exception e) {
-            // 3. THE SAFETY NET: If writing to the DB fails, we must manually delete the orphaned file!
             try {
                 Files.deleteIfExists(filePath);
             } catch (IOException ioException) {
                 System.err.println("CRITICAL: Failed to delete orphaned file: " + filePath);
             }
-            // Re-throw to trigger the Database Rollback
             throw new RuntimeException("Failed to upload profile picture: " + e.getMessage());
         }
+    }
+
+    @Transactional
+    public void submitVerificationTicket(String email, MultipartFile file, String userMessage, String enterpriseName) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!user.isPremium()) {
+            throw new RuntimeException("Only Premium members can request Enterprise Verification.");
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        String extension = originalFilename != null ? originalFilename.substring(originalFilename.lastIndexOf(".")) : ".jpg";
+        String newFileName = "VERIFY_" + UUID.randomUUID().toString() + extension;
+        Path filePath = Paths.get(UPLOAD_DIR + newFileName);
+
+        try {
+            Files.createDirectories(filePath.getParent());
+            Files.write(filePath, file.getBytes());
+
+            VerificationRequest ticket = new VerificationRequest();
+            ticket.setUser(user);
+            ticket.setDocumentUrl(newFileName);
+            ticket.setUserMessage(userMessage);
+            ticket.setEnterpriseName(enterpriseName);
+            ticket.setStatus(VerificationRequest.RequestStatus.PENDING);
+
+            verificationRequestRepository.save(ticket);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to upload verification document: " + e.getMessage());
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public VerificationRequestDTO getMyVerificationTicket(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return verificationRequestRepository.findTopByUserOrderBySubmittedAtDesc(user)
+                .map(v -> VerificationRequestDTO.builder()
+                        .requestId(v.getRequestId())
+                        .documentUrl(v.getDocumentUrl())
+                        .userMessage(v.getUserMessage())
+                        .adminReply(v.getAdminReply())
+                        .status(v.getStatus())
+                        .submittedAt(v.getSubmittedAt())
+                        .enterpriseName(v.getEnterpriseName())
+                        .build())
+                .orElse(null);
     }
 
     // ==========================================
@@ -167,6 +209,7 @@ public class UserService {
                 .role(user.getRole().name())
                 .isVerified(user.isVerified())
                 .isPremium(user.isPremium())
+                .enterpriseName(user.getEnterpriseName())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

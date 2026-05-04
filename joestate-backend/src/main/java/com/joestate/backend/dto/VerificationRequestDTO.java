@@ -18,6 +18,10 @@ public class VerificationRequestDTO {
     private String userEmail;
     private String userFullName;
     private String documentUrl;
+    private String userMessage;
+    private String adminReply;
+    private String enterpriseName;
     private RequestStatus status;
     private LocalDateTime submittedAt;
+    private String assignedAdminName;
 }

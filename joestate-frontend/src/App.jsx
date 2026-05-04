@@ -17,6 +17,7 @@ import AdminLayout from './components/AdminLayout';
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminVerifications from "./pages/admin/AdminVerifications";
 
 const AppContent = () => {
     const location = useLocation();
@@ -53,8 +54,7 @@ const AppContent = () => {
                             <Route path="/admin" element={<AdminDashboard />} />
                             <Route path="/admin/reports" element={<AdminReports />} />
                             <Route path="/admin/users" element={<AdminUsers />} />
-                            {/* Future routes */}
-                            <Route path="/admin/verifications" element={<div>Verifications Config</div>} />
+                            <Route path="/admin/verifications" element={<AdminVerifications />} />
                         </Route>
                     </Route>
                 </Routes>

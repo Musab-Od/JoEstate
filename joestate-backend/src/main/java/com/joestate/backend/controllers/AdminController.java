@@ -1,12 +1,20 @@
 package com.joestate.backend.controllers;
 
 import com.joestate.backend.dto.ReportDTO;
+import com.joestate.backend.dto.PropertyDTO;
+import com.joestate.backend.dto.UserDTO;
+import com.joestate.backend.dto.VerificationRequestDTO;
+import com.joestate.backend.dto.ReportResolutionRequest;
+import com.joestate.backend.dto.VerificationResolutionRequest;
+import com.joestate.backend.entities.User.BanStatus;
 import com.joestate.backend.services.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -21,12 +29,12 @@ public class AdminController {
     // ==========================================
 
     @GetMapping("/kpis")
-    public ResponseEntity<java.util.Map<String, Long>> getPlatformKPIs() {
+    public ResponseEntity<Map<String, Long>> getPlatformKPIs() {
         return ResponseEntity.ok(adminService.getPlatformKPIs());
     }
 
     @GetMapping("/activity")
-    public ResponseEntity<List<java.util.Map<String, Object>>> getRecentActivity() {
+    public ResponseEntity<List<Map<String, Object>>> getRecentActivity() {
         return ResponseEntity.ok(adminService.getRecentActivity());
     }
 
@@ -35,7 +43,7 @@ public class AdminController {
     // ==========================================
 
     @GetMapping("/users/search")
-    public ResponseEntity<List<com.joestate.backend.dto.UserDTO>> searchUsers(
+    public ResponseEntity<List<UserDTO>> searchUsers(
             @RequestParam(required = false, defaultValue = "") String query) {
         return ResponseEntity.ok(adminService.searchUsers(query));
     }
@@ -48,10 +56,10 @@ public class AdminController {
     @PutMapping("/users/{userId}/ban")
     public ResponseEntity<String> updateUserBanStatus(
             @PathVariable Long userId,
-            @RequestParam com.joestate.backend.entities.User.BanStatus status,
+            @RequestParam BanStatus status,
             @RequestParam(required = false, defaultValue = "Manual Admin Override") String notes) {
 
-        String adminEmail = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        String adminEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         adminService.updateUserBanStatusWithAudit(userId, status, notes, adminEmail);
         return ResponseEntity.ok("User restriction updated to: " + status);
     }
@@ -61,12 +69,12 @@ public class AdminController {
     // ==========================================
 
     @GetMapping("/users/{userId}/properties")
-    public ResponseEntity<List<com.joestate.backend.dto.PropertyDTO>> getAdminUserProperties(@PathVariable Long userId) {
+    public ResponseEntity<List<PropertyDTO>> getAdminUserProperties(@PathVariable Long userId) {
         return ResponseEntity.ok(adminService.getUserPropertiesForAdmin(userId));
     }
 
     @GetMapping("/properties/suspended")
-    public ResponseEntity<List<com.joestate.backend.dto.PropertyDTO>> getSuspendedProperties() {
+    public ResponseEntity<List<PropertyDTO>> getSuspendedProperties() {
         return ResponseEntity.ok(adminService.getSuspendedPropertiesArchive());
     }
 
@@ -75,7 +83,7 @@ public class AdminController {
             @PathVariable Long propertyId,
             @RequestParam(required = false, defaultValue = "Manual Admin Override") String notes) {
 
-        String adminEmail = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        String adminEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         adminService.togglePropertySuspension(propertyId, notes, adminEmail);
 
         return ResponseEntity.ok("Property suspension toggled and audited.");
@@ -92,7 +100,7 @@ public class AdminController {
 
     @GetMapping("/reports/workspace")
     public ResponseEntity<List<ReportDTO>> getMyWorkspace() {
-        String adminEmail = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        String adminEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         return ResponseEntity.ok(adminService.getMyWorkspace(adminEmail));
     }
 
@@ -103,22 +111,17 @@ public class AdminController {
 
     @PutMapping("/reports/{reportId}/claim")
     public ResponseEntity<String> claimReport(@PathVariable Long reportId) {
-        String adminEmail = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        String adminEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         adminService.claimReport(reportId, adminEmail);
         return ResponseEntity.ok("Report claimed successfully.");
-    }
-
-    public static class ResolveRequest {
-        public String action;
-        public String notes;
     }
 
     @PutMapping("/reports/{reportId}/resolve")
     public ResponseEntity<String> resolveReport(
             @PathVariable Long reportId,
-            @RequestBody ResolveRequest request) {
-        String adminEmail = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-        adminService.resolveReport(reportId, request.action, request.notes, adminEmail);
+            @RequestBody ReportResolutionRequest request) {
+        String adminEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        adminService.resolveReport(reportId, request.getAction(), request.getNotes(), adminEmail);
         return ResponseEntity.ok("Report resolved successfully.");
     }
 
@@ -126,16 +129,47 @@ public class AdminController {
     // 5. ENTERPRISE VERIFICATION
     // ==========================================
 
-    @GetMapping("/verifications/pending")
-    public ResponseEntity<List<com.joestate.backend.dto.VerificationRequestDTO>> getPendingVerifications() {
-        return ResponseEntity.ok(adminService.getPendingVerifications());
+    @GetMapping("/verifications/queue")
+    public ResponseEntity<List<VerificationRequestDTO>> getGlobalVerificationQueue() {
+        return ResponseEntity.ok(adminService.getGlobalVerificationQueue());
+    }
+
+    @GetMapping("/verifications/workspace")
+    public ResponseEntity<List<VerificationRequestDTO>> getMyVerificationWorkspace() {
+        String adminEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        return ResponseEntity.ok(adminService.getMyVerificationWorkspace(adminEmail));
+    }
+
+    @GetMapping("/verifications/resolved")
+    public ResponseEntity<List<VerificationRequestDTO>> getResolvedVerifications() {
+        return ResponseEntity.ok(adminService.getResolvedVerifications());
+    }
+
+    @GetMapping("/verifications/roster")
+    public ResponseEntity<List<UserDTO>> getVerifiedAgencies() {
+        return ResponseEntity.ok(adminService.getVerifiedAgencies());
+    }
+
+    @PutMapping("/verifications/{requestId}/claim")
+    public ResponseEntity<String> claimVerification(@PathVariable Long requestId) {
+        String adminEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        adminService.claimVerification(requestId, adminEmail);
+        return ResponseEntity.ok("Ticket claimed successfully.");
     }
 
     @PutMapping("/verifications/{requestId}/resolve")
     public ResponseEntity<String> resolveVerification(
             @PathVariable Long requestId,
-            @RequestParam String action) {
-        adminService.resolveVerification(requestId, action);
-        return ResponseEntity.ok("Verification request marked as: " + action);
+            @RequestBody VerificationResolutionRequest requestBody) {
+        String adminEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        adminService.resolveVerification(requestId, requestBody.getAction(), requestBody.getAdminReply(), adminEmail);
+        return ResponseEntity.ok("Verification request marked as: " + requestBody.getAction());
+    }
+
+    @PutMapping("/verifications/users/{userId}/revoke")
+    public ResponseEntity<String> revokeVerification(@PathVariable Long userId) {
+        String adminEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        adminService.revokeVerification(userId, adminEmail);
+        return ResponseEntity.ok("Verification revoked successfully.");
     }
 }

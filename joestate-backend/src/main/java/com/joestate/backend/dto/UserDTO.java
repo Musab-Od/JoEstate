@@ -22,6 +22,7 @@ public class UserDTO {
     private String role;
     private Boolean isVerified;
     private Boolean isPremium;
+    private String enterpriseName;
     private String banStatus;
     private java.time.LocalDateTime createdAt;
 

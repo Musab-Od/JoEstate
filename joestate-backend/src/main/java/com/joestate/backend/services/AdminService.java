@@ -82,6 +82,8 @@ public class AdminService {
                         .role(user.getRole().name())
                         .banStatus(user.getBanStatus().name())
                         .isVerified(user.isVerified())
+                        .isPremium(user.isPremium())
+                        .enterpriseName(user.getEnterpriseName())
                         .createdAt(user.getCreatedAt())
                         .build())
                 .collect(java.util.stream.Collectors.toList());
@@ -296,36 +298,117 @@ public class AdminService {
     // 5. ENTERPRISE VERIFICATION
     // ==========================================
 
-    public List<com.joestate.backend.dto.VerificationRequestDTO> getPendingVerifications() {
-        return verificationRequestRepository.findByStatus(com.joestate.backend.entities.VerificationRequest.RequestStatus.PENDING).stream()
-                .map(v -> com.joestate.backend.dto.VerificationRequestDTO.builder()
-                        .requestId(v.getRequestId())
-                        .userId(v.getUser().getUserId())
-                        .userEmail(v.getUser().getEmail())
-                        .userFullName(v.getUser().getFirstName() + " " + v.getUser().getLastName())
-                        .documentUrl(v.getDocumentUrl())
-                        .status(v.getStatus())
-                        .submittedAt(v.getSubmittedAt())
-                        .build())
-                .collect(java.util.stream.Collectors.toList());
+    public List<com.joestate.backend.dto.VerificationRequestDTO> getGlobalVerificationQueue() {
+        return verificationRequestRepository.findByStatusAndAssignedAdminIsNull(com.joestate.backend.entities.VerificationRequest.RequestStatus.PENDING).stream()
+                .map(this::mapVerificationToDTO).collect(java.util.stream.Collectors.toList());
+    }
+
+    public List<com.joestate.backend.dto.VerificationRequestDTO> getMyVerificationWorkspace(String adminEmail) {
+        return verificationRequestRepository.findByStatusAndAssignedAdmin_Email(com.joestate.backend.entities.VerificationRequest.RequestStatus.PENDING, adminEmail).stream()
+                .map(this::mapVerificationToDTO).collect(java.util.stream.Collectors.toList());
+    }
+
+    public List<com.joestate.backend.dto.VerificationRequestDTO> getResolvedVerifications() {
+        return verificationRequestRepository.findAll().stream()
+                .filter(v -> v.getStatus() != com.joestate.backend.entities.VerificationRequest.RequestStatus.PENDING)
+                .map(this::mapVerificationToDTO).collect(java.util.stream.Collectors.toList());
     }
 
     @Transactional
-    public void resolveVerification(Long requestId, String action) {
+    public void claimVerification(Long requestId, String adminEmail) {
         com.joestate.backend.entities.VerificationRequest request = verificationRequestRepository.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Request not found"));
 
+        if (request.getStatus() != com.joestate.backend.entities.VerificationRequest.RequestStatus.PENDING) {
+            throw new RuntimeException("This request has already been resolved.");
+        }
+        if (request.getAssignedAdmin() != null) {
+            if (request.getAssignedAdmin().getEmail().equals(adminEmail)) return;
+            throw new RuntimeException("This ticket is already claimed by another admin.");
+        }
+
+        User admin = userRepository.findByEmail(adminEmail).orElseThrow(() -> new RuntimeException("Admin not found"));
+        request.setAssignedAdmin(admin);
+        verificationRequestRepository.save(request);
+    }
+
+    @Transactional
+    public void resolveVerification(Long requestId, String action, String adminReply, String adminEmail) {
+        com.joestate.backend.entities.VerificationRequest request = verificationRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Request not found"));
+
+        if (request.getAssignedAdmin() == null || !request.getAssignedAdmin().getEmail().equals(adminEmail)) {
+            throw new RuntimeException("You must claim this ticket into your workspace before resolving it.");
+        }
+
+        User user = request.getUser();
+        request.setAdminReply(adminReply);
+
         if ("APPROVE".equalsIgnoreCase(action)) {
             request.setStatus(com.joestate.backend.entities.VerificationRequest.RequestStatus.APPROVED);
-            User user = request.getUser();
             user.setVerified(true);
+            user.setEnterpriseName(request.getEnterpriseName());
             userRepository.save(user);
+            notificationService.createSystemAlertNotification(user, "Congratulations! Your Enterprise Verification request has been approved.", null);
         } else if ("REJECT".equalsIgnoreCase(action)) {
             request.setStatus(com.joestate.backend.entities.VerificationRequest.RequestStatus.REJECTED);
+            notificationService.createSystemAlertNotification(user, "Your Enterprise Verification request was reviewed and rejected. Check the ticket for details.", null);
         } else {
             throw new RuntimeException("Invalid action. Use APPROVE or REJECT.");
         }
         verificationRequestRepository.save(request);
+    }
+
+    public List<com.joestate.backend.dto.UserDTO> getVerifiedAgencies() {
+        return userRepository.findAll().stream()
+                .filter(User::isVerified)
+                .map(user -> com.joestate.backend.dto.UserDTO.builder()
+                        .userId(user.getUserId())
+                        .firstName(user.getFirstName())
+                        .lastName(user.getLastName())
+                        .email(user.getEmail())
+                        .phoneNumber(user.getPhoneNumber())
+                        .isVerified(user.isVerified())
+                        .enterpriseName(user.getEnterpriseName())
+                        .createdAt(user.getCreatedAt())
+                        .build()).collect(java.util.stream.Collectors.toList());
+    }
+
+    private com.joestate.backend.dto.VerificationRequestDTO mapVerificationToDTO(com.joestate.backend.entities.VerificationRequest v) {
+        return com.joestate.backend.dto.VerificationRequestDTO.builder()
+                .requestId(v.getRequestId())
+                .userId(v.getUser().getUserId())
+                .userEmail(v.getUser().getEmail())
+                .userFullName(v.getUser().getFirstName() + " " + v.getUser().getLastName())
+                .documentUrl(v.getDocumentUrl())
+                .userMessage(v.getUserMessage())
+                .adminReply(v.getAdminReply())
+                .enterpriseName(v.getEnterpriseName())
+                .status(v.getStatus())
+                .submittedAt(v.getSubmittedAt())
+                .assignedAdminName(v.getAssignedAdmin() != null ? v.getAssignedAdmin().getFirstName() + " " + v.getAssignedAdmin().getLastName() : null)
+                .build();
+    }
+
+    @Transactional
+    public void revokeVerification(Long userId, String adminEmail) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // 1. Strip the badge and name
+        user.setVerified(false);
+        user.setEnterpriseName(null);
+        userRepository.save(user);
+
+        // 2. Mark their latest ticket as REJECTED so the frontend lets them apply again!
+        verificationRequestRepository.findTopByUserOrderBySubmittedAtDesc(user).ifPresent(ticket -> {
+            ticket.setStatus(com.joestate.backend.entities.VerificationRequest.RequestStatus.REJECTED);
+            ticket.setAdminReply("Verification manually revoked by Trust & Safety.");
+            verificationRequestRepository.save(ticket);
+        });
+
+        // 3. Notify the user
+        notificationService.createSystemAlertNotification(user, "Your Enterprise Verification badge has been revoked by an Administrator.", null);
     }
 
     // ==========================================

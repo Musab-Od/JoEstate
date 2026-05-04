@@ -1,18 +1,15 @@
-import { MapPin, BedDouble, Bath, Square, PlayCircle, Crown } from "lucide-react";
+import { MapPin, BedDouble, Bath, Square, PlayCircle, Crown, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const FeaturedPropertyCard = ({ property }) => {
     const navigate = useNavigate();
 
-    // Helper to format currency
     const formatPrice = (price) => new Intl.NumberFormat('en-JO').format(price);
 
-    // Get image or placeholder
     const mainImage = property.imageUrls && property.imageUrls.length > 0
         ? `http://localhost:8080/uploads/${property.imageUrls[0]}`
         : "https://images.unsplash.com/photo-1600596542815-2495db98dada?auto=format&fit=crop&q=80&w=800";
 
-    // --- SMART THUMBNAIL LOGIC ---
     const isVideoThumbnail = mainImage.endsWith('.mp4') || mainImage.endsWith('.webm');
     const isPremiumListing = property.isPremium;
 
@@ -22,7 +19,6 @@ const FeaturedPropertyCard = ({ property }) => {
             className={`group relative h-[400px] w-full rounded-3xl overflow-hidden cursor-pointer shadow-xl transition-all hover:shadow-2xl 
                 ${isPremiumListing ? 'ring-2 ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.3)]' : ''}`}
         >
-            {/* Background Image or Video */}
             {isVideoThumbnail ? (
                 <div className="absolute inset-0 bg-black">
                     <video
@@ -32,7 +28,6 @@ const FeaturedPropertyCard = ({ property }) => {
                         playsInline
                         preload="metadata"
                     />
-                    {/* Play button overlay */}
                     <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors z-10">
                         <PlayCircle className="w-16 h-16 text-white/90 drop-shadow-lg scale-90 group-hover:scale-100 transition-transform" />
                     </div>
@@ -44,19 +39,23 @@ const FeaturedPropertyCard = ({ property }) => {
                 />
             )}
 
-            {/* Dark Gradient Overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-80 group-hover:opacity-90 transition-opacity z-10" />
 
-            {/* VIP Badge */}
-            {isPremiumListing && (
-                <div className="absolute top-4 right-4 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 z-20 uppercase tracking-widest">
-                    <Crown className="w-4 h-4" /> VIP
-                </div>
-            )}
+            {/* --- SMART TRUST BADGES (TOP RIGHT) --- */}
+            <div className="absolute top-4 right-4 flex gap-2 z-20">
+                {property.ownerIsVerified && (
+                    <div className="bg-blue-600 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 uppercase tracking-widest">
+                        <ShieldCheck className="w-4 h-4" /> Verified
+                    </div>
+                )}
+                {isPremiumListing && (
+                    <div className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 uppercase tracking-widest">
+                        <Crown className="w-4 h-4" /> VIP
+                    </div>
+                )}
+            </div>
 
-            {/* Content */}
             <div className="absolute bottom-0 left-0 w-full p-6 text-white translate-y-2 group-hover:translate-y-0 transition-transform duration-300 z-20">
-                {/* Badges */}
                 <div className="flex gap-2 mb-3">
                     <span className="bg-blue-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
                         {property.purpose === 'BUY' ? 'For Sale' : 'For Rent'}
@@ -72,7 +71,6 @@ const FeaturedPropertyCard = ({ property }) => {
                     {property.location}
                 </div>
 
-                {/* Specs Row */}
                 <div className="flex items-center justify-between border-t border-white/20 pt-4 mt-2">
                     <div className="flex gap-4 text-sm font-medium">
                         {property.type !== 'LAND' && (

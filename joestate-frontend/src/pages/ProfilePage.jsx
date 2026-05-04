@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "../api/axios";
-import { User, Save, Camera, Mail, Lock, Building2, Heart, Settings, Plus } from "lucide-react";
+import { User, Save, Camera, Mail, Lock, Building2, Heart, Settings, Plus, ShieldCheck, Clock, CheckCircle, XCircle, Upload, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SearchResultCard from "../components/SearchResultCard";
 
@@ -12,6 +12,14 @@ const ProfilePage = () => {
 
     const [myProperties, setMyProperties] = useState([]);
     const [myFavorites, setMyFavorites] = useState([]);
+
+    // --- NEW: VERIFICATION TICKET STATES ---
+    const [verificationTicket, setVerificationTicket] = useState(null);
+    const [ticketMessage, setTicketMessage] = useState("");
+    const [ticketFile, setTicketFile] = useState(null);
+    const [submittingTicket, setSubmittingTicket] = useState(false);
+    const [enterpriseName, setEnterpriseName] = useState("");
+
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -21,24 +29,29 @@ const ProfilePage = () => {
                 const token = localStorage.getItem("token");
                 const headers = { Authorization: `Bearer ${token}` };
 
-                const [userRes, propsRes, favsRes] = await Promise.all([
+                // Added the verification endpoint to the Promise.all!
+                // We use .catch so if it fails (or user has no ticket), it doesn't break the dashboard
+                const [userRes, propsRes, favsRes, ticketRes] = await Promise.all([
                     axios.get("/users/me", { headers }),
                     axios.get("/users/me/properties", { headers }),
-                    axios.get("/users/me/favorites", { headers })
+                    axios.get("/users/me/favorites", { headers }),
+                    axios.get("/users/me/verification", { headers }).catch(() => ({ data: null }))
                 ]);
 
                 setUser({ ...userRes.data, oldPassword: "", newPassword: "", confirmPassword: "" });
 
-                // --- GP2: SMART SORTING ---
-                // Active on top, Sold/Rented on the bottom
                 const sortedProperties = propsRes.data.sort((a, b) => {
                     if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1;
                     if (a.status !== 'ACTIVE' && b.status === 'ACTIVE') return 1;
-                    return 0; // If both are same status, keep original order
+                    return 0;
                 });
                 setMyProperties(sortedProperties);
 
                 setMyFavorites(favsRes.data);
+
+                if (ticketRes && ticketRes.data) {
+                    setVerificationTicket(ticketRes.data);
+                }
 
             } catch (err) {
                 console.error("Failed to load dashboard data", err);
@@ -51,30 +64,17 @@ const ProfilePage = () => {
 
     const handleChange = (e) => setUser({ ...user, [e.target.name]: e.target.value });
 
-    // THE SMART HANDLER: Keeps everything in sync
     const handleFavoriteChange = (propertyId, isLiked) => {
-
-        // 1. Update 'myProperties' so the heart color persists if we switch tabs
         setMyProperties(prevProps =>
-            prevProps.map(prop =>
-                prop.propertyId === propertyId
-                    ? { ...prop, isFavorite: isLiked }
-                    : prop
-            )
+            prevProps.map(prop => prop.propertyId === propertyId ? { ...prop, isFavorite: isLiked } : prop)
         );
 
-        // 2. Update 'myFavorites' List and Counter
         if (isLiked) {
-            // Case A: ADDING to favorites
-            // We need to find the full property object from 'myProperties' to add it to 'myFavorites'
             const propertyToAdd = myProperties.find(p => p.propertyId === propertyId);
-
-            // Only add if found and not already in list (prevent duplicates)
             if (propertyToAdd && !myFavorites.some(f => f.propertyId === propertyId)) {
                 setMyFavorites(prev => [...prev, { ...propertyToAdd, isFavorite: true }]);
             }
         } else {
-            // Case B: REMOVING from favorites
             setMyFavorites(prev => prev.filter(item => item.propertyId !== propertyId));
         }
     };
@@ -116,15 +116,56 @@ const ProfilePage = () => {
         }
     };
 
+    // --- NEW: SUBMIT TICKET HANDLER ---
+    const handleTicketSubmit = async (e) => {
+        e.preventDefault();
+        if (!ticketFile || !ticketMessage.trim()) {
+            return alert("Please provide both a document and a message for the review team.");
+        }
+
+        setSubmittingTicket(true);
+        const formData = new FormData();
+        formData.append("file", ticketFile);
+        formData.append("message", ticketMessage);
+
+        if (enterpriseName.trim()) {
+            formData.append("enterpriseName", enterpriseName.trim());
+        }
+
+        try {
+            const token = localStorage.getItem("token");
+            await axios.post("/users/me/verification", formData, {
+                headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" }
+            });
+
+            // Refresh ticket data instantly
+            const res = await axios.get("/users/me/verification", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setVerificationTicket(res.data);
+            setTicketMessage("");
+            setEnterpriseName("");
+            setTicketFile(null);
+
+        } catch (err) {
+            alert(err.response?.data?.message || "Failed to submit ticket.");
+        } finally {
+            setSubmittingTicket(false);
+        }
+    };
+
     if (loading) return <div className="text-center py-20 text-blue-600 font-bold">Loading Dashboard...</div>;
 
     const avatarUrl = user.profilePictureUrl ? `http://localhost:8080/uploads/${user.profilePictureUrl}` : null;
+    const displayName = (user.isVerified && user.enterpriseName)
+        ? user.enterpriseName
+        : `${user.firstName} ${user.lastName}`;
 
     return (
         <div className="min-h-screen bg-gray-50 pb-20">
 
             <div className="bg-blue-900 pt-10 pb-16 px-4">
-                <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-6">
+                <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-6">
                     <div className="relative group">
                         <div className="w-28 h-28 rounded-full border-4 border-white/20 overflow-hidden bg-white shadow-lg">
                             {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" /> : <User className="w-full h-full p-6 text-gray-300" />}
@@ -134,8 +175,12 @@ const ProfilePage = () => {
                             <input type="file" className="hidden" onChange={handleImageUpload} accept="image/*" />
                         </label>
                     </div>
-                    <div className="text-center md:text-left text-white">
-                        <h1 className="text-3xl font-bold">{user.firstName} {user.lastName}</h1>
+                    <div className="text-center md:text-left text-white flex-grow">
+                        <div className="flex items-center justify-center md:justify-start gap-3">
+                            <h1 className="text-3xl font-bold">{displayName}</h1>
+                            {/* Blue checkmark in header if verified! */}
+                            {user.isVerified && <ShieldCheck className="w-6 h-6 text-blue-400" />}
+                        </div>
                         <p className="text-blue-200 flex items-center justify-center md:justify-start gap-2 mt-1">
                             <Mail className="w-4 h-4" /> {user.email}
                         </p>
@@ -143,18 +188,21 @@ const ProfilePage = () => {
                 </div>
             </div>
 
-            <div className="max-w-4xl mx-auto px-4 mt-8">
+            <div className="max-w-5xl mx-auto px-4 mt-8">
 
-                <div className="bg-white rounded-t-2xl shadow-sm border-b border-gray-100 flex overflow-hidden">
-                    <button onClick={() => setActiveTab("settings")} className={`flex-1 py-4 font-bold text-sm flex items-center justify-center gap-2 transition ${activeTab === "settings" ? "text-blue-600 bg-blue-50 border-b-2 border-blue-600" : "text-gray-500 hover:bg-gray-50"}`}>
+                <div className="bg-white rounded-t-2xl shadow-sm border-b border-gray-100 flex overflow-x-auto overflow-y-hidden">
+                    <button onClick={() => setActiveTab("settings")} className={`flex-1 min-w-[150px] py-4 font-bold text-sm flex items-center justify-center gap-2 transition ${activeTab === "settings" ? "text-blue-600 bg-blue-50 border-b-2 border-blue-600" : "text-gray-500 hover:bg-gray-50"}`}>
                         <Settings className="w-4 h-4" /> Settings
                     </button>
-                    <button onClick={() => setActiveTab("listings")} className={`flex-1 py-4 font-bold text-sm flex items-center justify-center gap-2 transition ${activeTab === "listings" ? "text-blue-600 bg-blue-50 border-b-2 border-blue-600" : "text-gray-500 hover:bg-gray-50"}`}>
+                    <button onClick={() => setActiveTab("listings")} className={`flex-1 min-w-[150px] py-4 font-bold text-sm flex items-center justify-center gap-2 transition ${activeTab === "listings" ? "text-blue-600 bg-blue-50 border-b-2 border-blue-600" : "text-gray-500 hover:bg-gray-50"}`}>
                         <Building2 className="w-4 h-4" /> My Listings ({myProperties.length})
                     </button>
-                    {/* COUNTER UPDATES AUTOMATICALLY NOW */}
-                    <button onClick={() => setActiveTab("favorites")} className={`flex-1 py-4 font-bold text-sm flex items-center justify-center gap-2 transition ${activeTab === "favorites" ? "text-blue-600 bg-blue-50 border-b-2 border-blue-600" : "text-gray-500 hover:bg-gray-50"}`}>
+                    <button onClick={() => setActiveTab("favorites")} className={`flex-1 min-w-[150px] py-4 font-bold text-sm flex items-center justify-center gap-2 transition ${activeTab === "favorites" ? "text-blue-600 bg-blue-50 border-b-2 border-blue-600" : "text-gray-500 hover:bg-gray-50"}`}>
                         <Heart className="w-4 h-4" /> Favorites ({myFavorites.length})
+                    </button>
+                    {/* NEW TAB */}
+                    <button onClick={() => setActiveTab("verification")} className={`flex-1 min-w-[150px] py-4 font-bold text-sm flex items-center justify-center gap-2 transition ${activeTab === "verification" ? "text-blue-600 bg-blue-50 border-b-2 border-blue-600" : "text-gray-500 hover:bg-gray-50"}`}>
+                        <ShieldCheck className="w-4 h-4" /> Verification
                     </button>
                 </div>
 
@@ -204,12 +252,7 @@ const ProfilePage = () => {
                             ) : (
                                 <div className="space-y-4">
                                     {myProperties.map(prop => (
-                                        <SearchResultCard
-                                            key={prop.propertyId}
-                                            property={prop}
-                                            // PASS CALLBACK HERE TOO
-                                            onFavoriteToggle={handleFavoriteChange}
-                                        />
+                                        <SearchResultCard key={prop.propertyId} property={prop} onFavoriteToggle={handleFavoriteChange} />
                                     ))}
                                 </div>
                             )}
@@ -229,15 +272,150 @@ const ProfilePage = () => {
                             ) : (
                                 <div className="space-y-4">
                                     {myFavorites.map(prop => (
-                                        <SearchResultCard
-                                            key={prop.propertyId}
-                                            property={prop}
-                                            isFavorited={true}
-                                            // PASS CALLBACK HERE TOO
-                                            onFavoriteToggle={handleFavoriteChange}
-                                        />
+                                        <SearchResultCard key={prop.propertyId} property={prop} isFavorited={true} onFavoriteToggle={handleFavoriteChange} />
                                     ))}
                                 </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* --- TAB 4: ENTERPRISE VERIFICATION --- */}
+                    {activeTab === "verification" && (
+                        <div className="max-w-2xl mx-auto pt-4 animate-in fade-in duration-300">
+                            <h3 className="text-2xl font-black text-gray-900 mb-2 flex items-center gap-2">
+                                <ShieldCheck className="w-7 h-7 text-blue-600" /> Enterprise Verification
+                            </h3>
+                            <p className="text-gray-500 font-medium mb-8">
+                                Earn the Blue Checkmark to build trust with buyers and show you are a verified real estate professional or agency.
+                            </p>
+
+                            {!user.isPremium ? (
+                                /* SCENARIO A: Free User (Upsell) */
+                                <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200 rounded-3xl p-8 text-center shadow-sm">
+                                    <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <Lock className="w-8 h-8 text-yellow-600" />
+                                    </div>
+                                    <h4 className="font-bold text-gray-900 text-xl mb-2">Premium Feature Locked</h4>
+                                    <p className="text-yellow-800 text-sm mb-6 max-w-sm mx-auto font-medium">
+                                        You must have an active Premium Subscription to apply for Enterprise Verification and receive the Blue Checkmark.
+                                    </p>
+                                    {/* Link this to wherever your checkout modal is later */}
+                                    <button className="bg-yellow-500 hover:bg-yellow-600 text-white font-black py-3 px-8 rounded-xl transition shadow-lg shadow-yellow-200">
+                                        Upgrade to Premium
+                                    </button>
+                                </div>
+                            ) : verificationTicket ? (
+                                /* SCENARIO B: User Has Submitted a Ticket */
+                                <div className="space-y-6">
+                                    {verificationTicket.status === 'PENDING' && (
+                                        <div className="bg-blue-50 border border-blue-200 p-6 rounded-2xl flex items-start gap-4">
+                                            <div className="bg-blue-100 p-3 rounded-full text-blue-600 shrink-0">
+                                                <Clock className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-blue-900 text-lg">Under Review</h4>
+                                                <p className="text-blue-700 text-sm font-medium mt-1">Our Trust & Safety team is currently reviewing your documents. This usually takes 24-48 hours.</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {verificationTicket.status === 'APPROVED' && (
+                                        <div className="bg-green-50 border border-green-200 p-6 rounded-2xl flex items-start gap-4">
+                                            <div className="bg-green-100 p-3 rounded-full text-green-600 shrink-0">
+                                                <CheckCircle className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-green-900 text-lg">Verification Approved</h4>
+                                                <p className="text-green-700 text-sm font-medium mt-1">Congratulations! Your account is now verified. The Blue Checkmark is active on your profile and properties.</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {verificationTicket.status === 'REJECTED' && (
+                                        <div className="bg-red-50 border border-red-200 p-6 rounded-2xl flex items-start gap-4">
+                                            <div className="bg-red-100 p-3 rounded-full text-red-600 shrink-0">
+                                                <XCircle className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-red-900 text-lg">Verification Rejected</h4>
+                                                <p className="text-red-700 text-sm font-medium mt-1 mb-3">Unfortunately, we could not verify your enterprise with the provided information.</p>
+                                                <button onClick={() => setVerificationTicket(null)} className="text-sm font-bold text-red-600 bg-white border border-red-200 px-4 py-2 rounded-lg hover:bg-red-50 transition">
+                                                    Submit a New Application
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Admin Reply Box (If Admin left a note) */}
+                                    {verificationTicket.adminReply && (
+                                        <div className="bg-gray-50 border border-gray-200 p-5 rounded-2xl">
+                                            <p className="text-xs font-bold text-gray-500 uppercase mb-2">Message from Trust & Safety Team:</p>
+                                            <p className="text-gray-800 font-medium italic">"{verificationTicket.adminReply}"</p>
+                                        </div>
+                                    )}
+
+                                    <div className="pt-4 text-xs text-gray-400 font-bold uppercase tracking-wider text-center">
+                                        Ticket ID: #{verificationTicket.requestId} • Submitted: {new Date(verificationTicket.submittedAt).toLocaleDateString()}
+                                    </div>
+                                </div>
+                            ) : (
+                                /* SCENARIO C: Premium User Applying */
+                                <form onSubmit={handleTicketSubmit} className="space-y-6">
+                                    <div className="bg-blue-50 border border-blue-100 p-5 rounded-2xl mb-6">
+                                        <h4 className="font-bold text-blue-900 mb-1">Application Requirements</h4>
+                                        <p className="text-sm text-blue-700 font-medium">Please provide a brief description of your real estate business and upload a valid Commercial License, Agency ID, or National ID.</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-bold text-gray-700 mb-2 block">Enterprise / Agency Name (Optional)</label>
+                                        <input
+                                            type="text"
+                                            value={enterpriseName}
+                                            onChange={(e) => setEnterpriseName(e.target.value)}
+                                            placeholder="E.g., Alexanders Real Estate (Leave blank if independent)"
+                                            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-800 mb-6"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-bold text-gray-700 mb-2 block">Tell us about your business</label>
+                                        <textarea
+                                            rows="4"
+                                            value={ticketMessage}
+                                            onChange={(e) => setTicketMessage(e.target.value)}
+                                            placeholder="E.g., I am an independent broker working in Amman for 5 years..."
+                                            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none font-medium text-gray-800"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="text-sm font-bold text-gray-700 mb-2 block">Upload Official Document</label>
+                                        <div className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center hover:bg-gray-50 transition">
+                                            <input
+                                                type="file"
+                                                id="docUpload"
+                                                className="hidden"
+                                                accept="image/*,.pdf"
+                                                onChange={(e) => setTicketFile(e.target.files[0])}
+                                            />
+                                            <label htmlFor="docUpload" className="cursor-pointer flex flex-col items-center">
+                                                <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-3">
+                                                    {ticketFile ? <FileText className="w-6 h-6" /> : <Upload className="w-6 h-6" />}
+                                                </div>
+                                                <span className="font-bold text-gray-900 mb-1">
+                                                    {ticketFile ? ticketFile.name : "Click to upload a document"}
+                                                </span>
+                                                <span className="text-xs text-gray-500 font-medium">JPG, PNG, or PDF (Max 5MB)</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        disabled={submittingTicket || !ticketMessage || !ticketFile}
+                                        className="w-full bg-blue-600 text-white px-6 py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <ShieldCheck className="w-5 h-5" />
+                                        {submittingTicket ? "Submitting Application..." : "Submit Application for Review"}
+                                    </button>
+                                </form>
                             )}
                         </div>
                     )}

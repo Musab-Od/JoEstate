@@ -29,6 +29,15 @@ public class VerificationRequest {
     @Column(nullable = false)
     private String documentUrl;
 
+    @Column(columnDefinition = "TEXT")
+    private String userMessage;
+
+    @Column(columnDefinition = "TEXT")
+    private String adminReply;
+
+    @Column(name = "enterprise_name")
+    private String enterpriseName;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RequestStatus status = RequestStatus.PENDING;
@@ -36,6 +45,10 @@ public class VerificationRequest {
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime submittedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_admin_id")
+    private User assignedAdmin;
 
     public enum RequestStatus {
         PENDING,

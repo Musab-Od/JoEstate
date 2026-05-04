@@ -39,6 +39,9 @@ public class SubscriptionCronJob {
             // 3. Strip the user of their Premium status
             User user = sub.getUser();
             user.setPremium(false);
+            user.setVerified(false);
+            user.setEnterpriseName(null);
+
             userRepository.save(user);
 
             System.out.println("Downgraded user: " + user.getEmail() + " due to expired subscription.");

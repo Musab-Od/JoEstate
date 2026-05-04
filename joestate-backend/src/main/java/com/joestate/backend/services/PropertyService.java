@@ -341,6 +341,8 @@ public class PropertyService {
                 .datePosted(p.getDatePosted())
                 .imageUrls(p.getImages().stream().map(PropertyImage::getImageUrl).collect(Collectors.toList()))
                 .isFavorite(isLiked)
+                .ownerEnterpriseName(p.getOwner().getEnterpriseName())
+                .ownerIsVerified(p.getOwner().isVerified())
                 .build();
     }
 

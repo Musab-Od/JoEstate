@@ -1,7 +1,9 @@
 package com.joestate.backend.controllers;
 
+import com.joestate.backend.dto.PaymentRequest;
 import com.joestate.backend.dto.PropertyDTO;
 import com.joestate.backend.dto.UserDTO;
+import com.joestate.backend.dto.VerificationRequestDTO;
 import com.joestate.backend.services.PropertyService;
 import com.joestate.backend.services.UserService;
 import jakarta.validation.Valid;
@@ -30,7 +32,7 @@ public class UserController {
 
     // 2. Update Profile
     @PutMapping("/me")
-    public ResponseEntity<UserDTO> updateProfile(Authentication authentication,@Valid @RequestBody UserDTO dto) {
+    public ResponseEntity<UserDTO> updateProfile(Authentication authentication, @Valid @RequestBody UserDTO dto) {
         return ResponseEntity.ok(userService.updateProfile(authentication.getName(), dto));
     }
 
@@ -45,7 +47,7 @@ public class UserController {
     @PostMapping("/me/upgrade")
     public ResponseEntity<String> upgradeToPremium(
             Authentication authentication,
-            @RequestBody com.joestate.backend.dto.PaymentRequest request) {
+            @RequestBody PaymentRequest request) {
 
         userService.upgradeToPremium(authentication.getName(), request);
         return ResponseEntity.ok("Payment Successful! Welcome to Premium.");
@@ -61,6 +63,28 @@ public class UserController {
     @GetMapping("/me/favorites")
     public ResponseEntity<List<PropertyDTO>> getMyFavorites(Authentication authentication) {
         return ResponseEntity.ok(propertyService.getFavoritesByUser(authentication.getName()));
+    }
+
+    // 6. Submit Enterprise Verification Ticket
+    @PostMapping(value = "/me/verification", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<String> submitVerificationRequest(
+            Authentication authentication,
+            @RequestParam("file") MultipartFile documentFile,
+            @RequestParam("message") String userMessage,
+            @RequestParam(value = "enterpriseName", required = false) String enterpriseName) {
+
+        userService.submitVerificationTicket(authentication.getName(), documentFile, userMessage, enterpriseName);
+        return ResponseEntity.ok("Verification ticket submitted successfully.");
+    }
+
+    // 7. Get My Verification Ticket Status
+    @GetMapping("/me/verification")
+    public ResponseEntity<VerificationRequestDTO> getMyVerificationTicket(Authentication authentication) {
+        VerificationRequestDTO ticket = userService.getMyVerificationTicket(authentication.getName());
+        if (ticket == null) {
+            return ResponseEntity.noContent().build(); // 204 No Content if no ticket exists
+        }
+        return ResponseEntity.ok(ticket);
     }
 
     // GET /api/users/{id} (Public Profile)

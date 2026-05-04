@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "../api/axios";
-import { User, Phone, MapPin, Flag, X, AlertTriangle, CheckCircle } from "lucide-react";
+import { User, Phone, MapPin, Flag, X, AlertTriangle, CheckCircle, ShieldCheck } from "lucide-react";
 import SearchResultCard from "../components/SearchResultCard";
 
 const PublicProfilePage = () => {
@@ -118,6 +118,10 @@ const PublicProfilePage = () => {
         ? `http://localhost:8080/uploads/${profile.profilePictureUrl}`
         : null;
 
+    const displayName = (profile.isVerified && profile.enterpriseName)
+        ? profile.enterpriseName
+        : `${profile.firstName} ${profile.lastName}`;
+
     return (
         <div className="min-h-screen bg-gray-50 pb-20 relative">
 
@@ -228,9 +232,13 @@ const PublicProfilePage = () => {
 
                     {/* Info */}
                     <div className="text-center md:text-left flex-1">
-                        <h1 className="text-3xl font-extrabold text-gray-900 mb-2">
-                            {profile.firstName} {profile.lastName}
-                        </h1>
+                        <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                            <h1 className="text-3xl font-extrabold text-gray-900">
+                                {displayName}
+                            </h1>
+                            {/* Blue checkmark if verified! */}
+                            {profile.isVerified && <ShieldCheck className="w-7 h-7 text-blue-500" />}
+                        </div>
                         <div className="flex flex-wrap justify-center md:justify-start gap-4 text-gray-600 font-medium mb-4">
                             {profile.phoneNumber && (
                                 <div className="flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full text-sm">
@@ -267,7 +275,7 @@ const PublicProfilePage = () => {
             {/* Listings Section */}
             <div className="max-w-4xl mx-auto px-4 mt-10">
                 <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                    Properties by {profile.firstName} <span className="text-gray-400 font-normal">({properties.length})</span>
+                    Properties by {displayName} <span className="text-gray-400 font-normal">({properties.length})</span>
                 </h2>
 
                 {properties.length === 0 ? (

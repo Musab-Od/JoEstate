@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "../api/axios";
-import { MapPin, BedDouble, Bath, Square, Phone, MessageCircle, Heart, Share2, Calendar, X, ChevronLeft, ChevronRight, Grid, User, Trash2, Edit, CheckCircle, Flag, AlertTriangle, ShieldAlert } from "lucide-react";
+import { MapPin, BedDouble, Bath, Square, Phone, MessageCircle, Heart, Share2, Calendar, X, ChevronLeft, ChevronRight, Grid, User, Trash2, Edit, CheckCircle, Flag, AlertTriangle, ShieldAlert, ShieldCheck } from "lucide-react";
 
 // --- SMART MEDIA RENDERER ---
 const MediaRenderer = ({ src, alt, className, autoPlay = true, controls = false }) => {
@@ -185,6 +185,10 @@ const PropertyDetailsPage = () => {
     const ownerAvatar = property.ownerProfilePictureUrl ? `http://localhost:8080/uploads/${property.ownerProfilePictureUrl}` : null;
     const isActive = property.status === 'ACTIVE';
     const soldOrRentedText = property.purpose === 'BUY' ? 'SOLD' : 'RENTED';
+
+    const ownerDisplayName = (property.ownerIsVerified && property.ownerEnterpriseName)
+        ? property.ownerEnterpriseName
+        : property.ownerName;
 
     const handleReportSubmit = async (e) => {
         e.preventDefault();
@@ -394,7 +398,10 @@ const PropertyDetailsPage = () => {
                             </div>
                             <div className="flex-grow">
                                 <p className="text-gray-400 text-xs font-bold uppercase group-hover:text-blue-600 transition">Listed by</p>
-                                <p className="text-gray-900 font-bold text-lg leading-tight">{property.ownerName}</p>
+                                <div className="flex items-center gap-1.5">
+                                    <p className="text-gray-900 font-bold text-lg leading-tight">{ownerDisplayName}</p>
+                                    {property.ownerIsVerified && <ShieldCheck className="w-5 h-5 text-blue-500" />}
+                                </div>
                                 <p className="text-xs text-blue-500 font-bold opacity-0 group-hover:opacity-100 transition mt-1">View Profile</p>
                             </div>
                         </div>

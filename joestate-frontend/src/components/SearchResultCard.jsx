@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapPin, BedDouble, Bath, Square, Heart, CheckCircle, PlayCircle, Crown } from "lucide-react";
+import { MapPin, BedDouble, Bath, Square, Heart, CheckCircle, PlayCircle, Crown, ShieldCheck } from "lucide-react";
 import axios from "../api/axios";
 
 const SearchResultCard = ({ property, isFavorited = null, onFavoriteToggle }) => {
@@ -25,7 +25,6 @@ const SearchResultCard = ({ property, isFavorited = null, onFavoriteToggle }) =>
         ? `http://localhost:8080/uploads/${property.imageUrls[0]}`
         : "https://images.unsplash.com/photo-1600596542815-2495db98dada?auto=format&fit=crop&q=80&w=800";
 
-    // --- SMART THUMBNAIL LOGIC ---
     const isVideoThumbnail = mainImage.endsWith('.mp4') || mainImage.endsWith('.webm');
 
     const toggleFavorite = async (e) => {
@@ -56,8 +55,6 @@ const SearchResultCard = ({ property, isFavorited = null, onFavoriteToggle }) =>
     };
 
     const isActive = !property.status || property.status === 'ACTIVE';
-
-    // Phase 4 Hook: If the property owner is premium, highlight the card!
     const isPremiumListing = property.isPremium;
 
     return (
@@ -71,14 +68,10 @@ const SearchResultCard = ({ property, isFavorited = null, onFavoriteToggle }) =>
             }
             `}
         >
-            {/* Left: Image / Video Thumbnail */}
-            {/* FIXED HEIGHT/WIDTH: md:h-48 md:w-64 ensures all cards are exactly the same size regardless of photo ratio */}
             <div className="w-full h-48 md:w-64 md:h-48 flex-shrink-0 relative rounded-xl overflow-hidden bg-gray-100">
 
-                {/* --- SMART THUMBNAIL RENDERER --- */}
                 {isVideoThumbnail ? (
                     <div className="relative w-full h-full">
-                        {/* The #t=0.1 trick forces the browser to load the first frame as an image! */}
                         <video
                             src={`${mainImage}#t=0.1`}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
@@ -86,7 +79,6 @@ const SearchResultCard = ({ property, isFavorited = null, onFavoriteToggle }) =>
                             playsInline
                             preload="metadata"
                         />
-                        {/* Play button overlay to show it's a video tour */}
                         <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors">
                             <PlayCircle className="w-12 h-12 text-white/90 drop-shadow-lg scale-90 group-hover:scale-100 transition-transform" />
                         </div>
@@ -95,14 +87,20 @@ const SearchResultCard = ({ property, isFavorited = null, onFavoriteToggle }) =>
                     <img src={mainImage} alt={property.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                 )}
 
-                {/* VIP Badge */}
-                {isPremiumListing && (
-                    <div className="absolute top-2 right-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-lg flex items-center gap-1 z-10 uppercase tracking-widest">
-                        <Crown className="w-3 h-3" /> VIP
-                    </div>
-                )}
+                {/* --- SMART TRUST BADGES (TOP RIGHT) --- */}
+                <div className="absolute top-2 right-2 flex gap-1.5 z-10">
+                    {property.ownerIsVerified && (
+                        <div className="bg-blue-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-lg flex items-center gap-1 uppercase tracking-widest">
+                            <ShieldCheck className="w-3 h-3" /> Verified
+                        </div>
+                    )}
+                    {isPremiumListing && (
+                        <div className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-lg flex items-center gap-1 uppercase tracking-widest">
+                            <Crown className="w-3 h-3" /> VIP
+                        </div>
+                    )}
+                </div>
 
-                {/* Sale/Rent Badges */}
                 {isActive && (
                     <div className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded uppercase shadow-md z-10">
                         {property.purpose === 'BUY' ? 'Sale' : 'Rent'}
@@ -116,7 +114,6 @@ const SearchResultCard = ({ property, isFavorited = null, onFavoriteToggle }) =>
                 )}
             </div>
 
-            {/* Right: Info */}
             <div className="flex-grow flex flex-col justify-between py-1">
                 <div>
                     <div className="flex justify-between items-start">

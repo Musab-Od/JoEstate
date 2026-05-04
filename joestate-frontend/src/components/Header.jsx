@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "../api/axios";
-import { User, LogOut, Menu, PlusCircle, Building2, ChevronDown, LayoutDashboard, Bell, MessageCircle, Heart, MessageSquare, ShieldAlert, ExternalLink, Crown } from "lucide-react";
+import { User, LogOut, Menu, PlusCircle, Building2, ChevronDown, LayoutDashboard, Bell, MessageCircle, Heart, MessageSquare, ShieldAlert, ExternalLink, Crown, ShieldCheck } from "lucide-react";
 import { useWebSocket } from "../context/WebSocketContext";
 import PremiumCheckoutModal from "./PremiumCheckoutModal";
 
@@ -41,7 +41,11 @@ const Header = () => {
             // Fetch User Avatar
             axios.get("/users/me", { headers: { Authorization: `Bearer ${token}` } })
                 .then(res => {
-                    setUserName(res.data.firstName);
+                    const displayName = (res.data.isVerified && res.data.enterpriseName)
+                        ? res.data.enterpriseName
+                        : res.data.firstName;
+
+                    setUserName(displayName);
                     setBanStatus(res.data.banStatus);
                     setIsPremium(res.data.isPremium);
                     if (res.data.profilePictureUrl) {
@@ -190,49 +194,62 @@ const Header = () => {
                                             {notifications.length === 0 ? (
                                                 <div className="p-4 text-center text-sm text-gray-500">No new notifications</div>
                                             ) : (
-                                                notifications.map(notif => (
-                                                    <div key={notif.notificationId} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition ${!notif.read ? 'bg-blue-50/30' : ''}`}>
-                                                        <div className="flex gap-3">
-                                                            {/* DYNAMIC ICON: Red Shield for System, Pink Heart for Favorites */}
-                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border ${notif.type === 'SYSTEM_ALERT' ? 'bg-red-50 border-red-200 text-red-600' : 'bg-pink-100 border-pink-200 text-pink-500'}`}>
-                                                                {notif.senderAvatarUrl ? (
-                                                                    <img src={`http://localhost:8080/uploads/${notif.senderAvatarUrl}`} alt="User" className="w-full h-full rounded-full object-cover" />
-                                                                ) : notif.type === 'SYSTEM_ALERT' ? (
-                                                                    <ShieldAlert className="w-5 h-5" />
-                                                                ) : (
-                                                                    <Heart className="w-5 h-5 fill-current" />
-                                                                )}
-                                                            </div>
+                                                notifications.map(notif => {
+                                                    // --- SMART ALERT LOGIC ---
+                                                    const isPositiveAlert = notif.type === 'SYSTEM_ALERT' && (notif.content.includes('Congratulations') || notif.content.includes('Good news'));
+                                                    const isNegativeAlert = notif.type === 'SYSTEM_ALERT' && !isPositiveAlert;
 
-                                                            <div className="flex-grow">
-                                                                <p className={`text-sm ${notif.type === 'SYSTEM_ALERT' ? 'font-bold text-red-700' : 'text-gray-800'}`}>
-                                                                    {notif.content}
-                                                                </p>
-                                                                <p className="text-[10px] text-gray-400 mt-1">{new Date(notif.createdAt).toLocaleDateString()}</p>
+                                                    return (
+                                                        <div key={notif.notificationId} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition ${!notif.read ? 'bg-blue-50/30' : ''}`}>
+                                                            <div className="flex gap-3">
+                                                                {/* DYNAMIC ICON & COLORS */}
+                                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border 
+                                                                    ${notif.type === 'FAVORITE' ? 'bg-pink-100 border-pink-200 text-pink-500' :
+                                                                    isPositiveAlert ? 'bg-emerald-50 border-emerald-200 text-emerald-600' :
+                                                                        'bg-red-50 border-red-200 text-red-600'}`}>
 
-                                                                {/* DYNAMIC ACTION BUTTONS */}
-                                                                {notif.type === 'FAVORITE' && notif.senderEmail && (
-                                                                    <button
-                                                                        onClick={() => handleMessageBuyer(notif.relatedId, notif.senderEmail, notif.notificationId)}
-                                                                        className="mt-2 text-xs flex items-center gap-1 font-bold text-blue-600 hover:text-blue-800 transition"
-                                                                    >
-                                                                        <MessageSquare className="w-3 h-3" /> Message {notif.senderName}
-                                                                    </button>
-                                                                )}
+                                                                    {notif.senderAvatarUrl ? (
+                                                                        <img src={`http://localhost:8080/uploads/${notif.senderAvatarUrl}`} alt="User" className="w-full h-full rounded-full object-cover" />
+                                                                    ) : notif.type === 'FAVORITE' ? (
+                                                                        <Heart className="w-5 h-5 fill-current" />
+                                                                    ) : isPositiveAlert ? (
+                                                                        <ShieldCheck className="w-5 h-5" />
+                                                                    ) : (
+                                                                        <ShieldAlert className="w-5 h-5" />
+                                                                    )}
+                                                                </div>
 
-                                                                {notif.type === 'SYSTEM_ALERT' && notif.relatedId && (
-                                                                    <Link
-                                                                        to={`/properties/${notif.relatedId}`}
-                                                                        onClick={() => setIsNotifOpen(false)}
-                                                                        className="mt-2 text-xs flex items-center gap-1 font-bold text-gray-600 hover:text-gray-900 transition"
-                                                                    >
-                                                                        <ExternalLink className="w-3 h-3" /> Inspect Property
-                                                                    </Link>
-                                                                )}
+                                                                <div className="flex-grow">
+                                                                    {/* DYNAMIC TEXT COLOR */}
+                                                                    <p className={`text-sm ${isNegativeAlert ? 'font-bold text-red-700' : isPositiveAlert ? 'font-bold text-emerald-700' : 'text-gray-800'}`}>
+                                                                        {notif.content}
+                                                                    </p>
+                                                                    <p className="text-[10px] text-gray-400 mt-1">{new Date(notif.createdAt).toLocaleDateString()}</p>
+
+                                                                    {/* DYNAMIC ACTION BUTTONS */}
+                                                                    {notif.type === 'FAVORITE' && notif.senderEmail && (
+                                                                        <button
+                                                                            onClick={() => handleMessageBuyer(notif.relatedId, notif.senderEmail, notif.notificationId)}
+                                                                            className="mt-2 text-xs flex items-center gap-1 font-bold text-blue-600 hover:text-blue-800 transition"
+                                                                        >
+                                                                            <MessageSquare className="w-3 h-3" /> Message {notif.senderName}
+                                                                        </button>
+                                                                    )}
+
+                                                                    {notif.type === 'SYSTEM_ALERT' && notif.relatedId && (
+                                                                        <Link
+                                                                            to={`/properties/${notif.relatedId}`}
+                                                                            onClick={() => setIsNotifOpen(false)}
+                                                                            className="mt-2 text-xs flex items-center gap-1 font-bold text-gray-600 hover:text-gray-900 transition"
+                                                                        >
+                                                                            <ExternalLink className="w-3 h-3" /> Inspect Property
+                                                                        </Link>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))
+                                                    )
+                                                })
                                             )}
                                         </div>
                                     </div>

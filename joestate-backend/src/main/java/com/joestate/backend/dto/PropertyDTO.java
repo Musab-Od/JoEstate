@@ -51,4 +51,7 @@ public class PropertyDTO {
     private List<MultipartFile> imageFiles;
 
     private LocalDateTime datePosted;
+
+    private String ownerEnterpriseName;
+    private boolean ownerIsVerified;
 }
