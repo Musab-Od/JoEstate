@@ -1,6 +1,7 @@
 package com.joestate.backend.repositories;
 
 import com.joestate.backend.entities.Property;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,8 +11,11 @@ import java.util.List;
 @Repository
 public interface PropertyRepository extends JpaRepository<Property, Long> {
 
+    // --- UPDATED MAIN SEARCH ---
     @Query("SELECT p FROM Property p WHERE " +
-            "(:loc IS NULL OR p.location LIKE %:loc%) AND " +
+            "(:loc1 IS NULL OR LOWER(p.location) LIKE LOWER(CONCAT('%', :loc1, '%'))) AND " +
+            "(:loc2 IS NULL OR LOWER(p.location) LIKE LOWER(CONCAT('%', :loc2, '%'))) AND " +
+            "(:loc3 IS NULL OR LOWER(p.location) LIKE LOWER(CONCAT('%', :loc3, '%'))) AND " +
             "(:purp IS NULL OR p.purpose = :purp) AND " +
             "(:type IS NULL OR p.type = :type) AND " +
             "(:freq IS NULL OR p.rentFrequency = :freq) AND " +
@@ -21,9 +25,12 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
             "(:maxA IS NULL OR p.area <= :maxA) AND " +
             "(:beds IS NULL OR p.roomCount >= :beds) AND " +
             "(:baths IS NULL OR p.bathCount >= :baths) AND " +
-            "(p.status = 'ACTIVE')")
+            "(p.status = 'ACTIVE') " +
+            "ORDER BY p.owner.isPremium DESC, p.datePosted DESC")
     List<Property> searchProperties(
-            @Param("loc") String location,
+            @Param("loc1") String loc1,
+            @Param("loc2") String loc2,
+            @Param("loc3") String loc3,
             @Param("purp") Property.Purpose purpose,
             @Param("type") Property.PropertyType type,
             @Param("freq") Property.RentFrequency frequency,
@@ -35,24 +42,28 @@ public interface PropertyRepository extends JpaRepository<Property, Long> {
             @Param("baths") Integer baths
     );
 
+    // --- UPDATED AUTOCOMPLETE ---
+    @Query("SELECT DISTINCT p.location FROM Property p WHERE " +
+            "(:loc1 IS NULL OR LOWER(p.location) LIKE LOWER(CONCAT('%', :loc1, '%'))) AND " +
+            "(:loc2 IS NULL OR LOWER(p.location) LIKE LOWER(CONCAT('%', :loc2, '%'))) AND " +
+            "(:loc3 IS NULL OR LOWER(p.location) LIKE LOWER(CONCAT('%', :loc3, '%')))")
+    List<String> findDistinctLocations(
+            @Param("loc1") String loc1,
+            @Param("loc2") String loc2,
+            @Param("loc3") String loc3
+    );
+
+    // --- 2. ALGORITHM FOR HOMEPAGE FEATURED ---
+    @Query("SELECT p FROM Property p WHERE p.status = :status ORDER BY p.owner.isPremium DESC, p.datePosted DESC")
+    List<Property> getGoldenFeaturedProperties(@Param("status") Property.Status status, Pageable pageable);
+
     @Query("SELECT DISTINCT p.location FROM Property p WHERE LOWER(p.location) LIKE LOWER(CONCAT('%', :query, '%'))")
     List<String> findDistinctLocations(@Param("query") String query);
 
-    List<Property> findTop6ByStatusOrderByDatePostedDesc(Property.Status status);
-
-    List<Property> findAllByOwner_Email(String email); // Finds all houses owned by this user
-
+    List<Property> findAllByOwner_Email(String email);
     List<Property> findAllByOwner_UserId(Long userId);
-
-    // For the KPI Dashboard
     long countByStatus(Property.Status status);
-
-    // For the Hot List
     List<Property> findTop5ByOrderByDatePostedDesc();
-
-    // Advanced Filtering: Find all suspended properties
     List<Property> findByStatusOrderByDatePostedDesc(Property.Status status);
-
-    // Advanced Filtering: Sort by Price Ascending (To catch "Villa for 5 JOD" scams)
     List<Property> findAllByOrderByPriceAsc();
 }

@@ -14,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.data.domain.PageRequest;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -37,21 +38,40 @@ public class PropertyService {
     // 1. PUBLIC READ METHODS (With Fav Logic)
     // ==========================================
 
+    // 1. UPDATE THE SEARCH METHOD
     public List<PropertyDTO> searchProperties(
             String location, Property.Purpose purpose, Property.PropertyType type,
             Property.RentFrequency rentFrequency, Double minPrice, Double maxPrice,
             Integer minArea, Integer maxArea, Integer beds, Integer baths
     ) {
-        Set<Long> likedIds = getLikedPropertyIds(); // Fetch once for efficiency
+        Set<Long> likedIds = getLikedPropertyIds();
+
+        // --- SMART STRING SPLITTER ---
+        String loc1 = null, loc2 = null, loc3 = null;
+        if (location != null && !location.trim().isEmpty()) {
+            // This splits the string by spaces OR commas, ignoring extra whitespace
+            String[] words = location.split("[,\\s]+");
+            if (words.length > 0) loc1 = words[0];
+            if (words.length > 1) loc2 = words[1];
+            if (words.length > 2) loc3 = words[2];
+        }
+
+        // Pass the split words to the repository
         List<Property> properties = propertyRepository.searchProperties(
-                location, purpose, type, rentFrequency, minPrice, maxPrice, minArea, maxArea, beds, baths
+                loc1, loc2, loc3, purpose, type, rentFrequency, minPrice, maxPrice, minArea, maxArea, beds, baths
         );
         return properties.stream().map(p -> mapToDTO(p, likedIds)).collect(Collectors.toList());
     }
 
     public List<PropertyDTO> getFeaturedProperties() {
         Set<Long> likedIds = getLikedPropertyIds();
-        List<Property> props = propertyRepository.findTop6ByStatusOrderByDatePostedDesc(Property.Status.ACTIVE);
+
+        // Pass PageRequest.of(0, 6) to limit the output to the Top 6 properties
+        List<Property> props = propertyRepository.getGoldenFeaturedProperties(
+                Property.Status.ACTIVE,
+                PageRequest.of(0, 6)
+        );
+
         return props.stream().map(p -> mapToDTO(p, likedIds)).collect(Collectors.toList());
     }
 
