@@ -15,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -338,11 +339,15 @@ public class PropertyService {
                 .purpose(p.getPurpose())
                 .status(p.getStatus())
                 .rentFrequency(p.getRentFrequency())
+                .isPremium(p.getOwner().isPremium())
                 .datePosted(p.getDatePosted())
                 .imageUrls(p.getImages().stream().map(PropertyImage::getImageUrl).collect(Collectors.toList()))
                 .isFavorite(isLiked)
                 .ownerEnterpriseName(p.getOwner().getEnterpriseName())
                 .ownerIsVerified(p.getOwner().isVerified())
+                .viewCount(p.getUniqueViewers() != null ? p.getUniqueViewers().size() : 0)
+                .phoneClickCount(p.getUniquePhoneClicks() != null ? p.getUniquePhoneClicks().size() : 0)
+                .favoriteCount(p.getFavoritedBy() != null ? p.getFavoritedBy().size() : 0)
                 .build();
     }
 
@@ -389,5 +394,22 @@ public class PropertyService {
         } catch (IOException e) {
             throw new RuntimeException("Failed to upload media files", e);
         }
+    }
+
+    // --- ANALYTICS ENGINE ---
+    @Transactional
+    public void trackView(Long propertyId, String viewerId) {
+        propertyRepository.findById(propertyId).ifPresent(property -> {
+            property.getUniqueViewers().add(viewerId); // Set ignores duplicates automatically!
+            propertyRepository.save(property);
+        });
+    }
+
+    @Transactional
+    public void trackPhoneClick(Long propertyId, String viewerId) {
+        propertyRepository.findById(propertyId).ifPresent(property -> {
+            property.getUniquePhoneClicks().add(viewerId);
+            propertyRepository.save(property);
+        });
     }
 }

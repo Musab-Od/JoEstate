@@ -41,6 +41,11 @@ public class PropertyDTO {
     private Purpose purpose;
     private RentFrequency rentFrequency;
     private Status status;
+    private Boolean isPremium;
+
+    private int viewCount;
+    private int phoneClickCount;
+    private int favoriteCount;
 
     private String ownerProfilePictureUrl;
 

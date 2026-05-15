@@ -57,14 +57,35 @@ const PropertyDetailsPage = () => {
                 setProperty(propRes.data);
                 setIsLiked(propRes.data.isFavorite || false);
 
+                let loggedInUser = null;
                 if (token) {
                     try {
                         const userRes = await axios.get("/users/me", config);
-                        setCurrentUser(userRes.data);
+                        loggedInUser = userRes.data;
+                        setCurrentUser(loggedInUser);
                     } catch (e) {
                         console.log("Not logged in or invalid token");
                     }
                 }
+
+                // --- PHASE 6: UNIQUE TRACKER FINGERPRINT ---
+                // Give guests a unique ID so we don't count their refreshes!
+                let viewerFingerprint = localStorage.getItem("joestate_device_id");
+                if (!viewerFingerprint) {
+                    viewerFingerprint = "GUEST_" + Math.random().toString(36).substring(2, 15);
+                    localStorage.setItem("joestate_device_id", viewerFingerprint);
+                }
+
+                // If they are logged in, use their actual User ID instead
+                const finalViewerId = loggedInUser ? `USER_${loggedInUser.userId}` : viewerFingerprint;
+
+                // --- PHASE 6: SMART VIEW TRACKER ---
+                const isOwner = loggedInUser && loggedInUser.userId === propRes.data.ownerId;
+                if (!isOwner) {
+                    axios.post(`/properties/${id}/track-view?viewerId=${finalViewerId}`)
+                        .catch(err => console.error("View tracking failed:", err.response?.status));
+                }
+
             } catch (err) {
                 console.error(err);
             } finally {
@@ -123,6 +144,18 @@ const PropertyDetailsPage = () => {
         } catch (err) {
             console.error(err);
             alert("Failed to start chat. Please try again.");
+        }
+    };
+
+    const handleShowPhone = () => {
+        if (!showPhone) {
+            setShowPhone(true);
+
+            let viewerId = localStorage.getItem("joestate_device_id") || "UNKNOWN";
+            if (currentUser) viewerId = `USER_${currentUser.userId}`;
+
+            axios.post(`/properties/${id}/track-phone?viewerId=${viewerId}`)
+                .catch(err => console.error("Phone tracking failed:", err.response?.status));
         }
     };
 
@@ -300,7 +333,6 @@ const PropertyDetailsPage = () => {
                     <button onClick={closeGallery} className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition z-50"><X className="w-8 h-8" /></button>
                     <button onClick={prevImage} className="absolute left-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition hidden md:block z-50"><ChevronLeft className="w-8 h-8" /></button>
 
-                    {/* SMART RENDERER: Turns on sound/controls for full screen video */}
                     <MediaRenderer
                         src={images[currentImageIndex]}
                         alt="Gallery"
@@ -324,13 +356,11 @@ const PropertyDetailsPage = () => {
                     )}
                     <div className={`grid h-full gap-2 ${images.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-4 grid-rows-2'} ${!isActive ? 'opacity-80 grayscale-[20%]' : ''}`}>
 
-                        {/* Main Image/Video */}
                         <div onClick={() => openGallery(0)} className={`relative cursor-pointer group overflow-hidden ${images.length === 1 ? 'col-span-1' : 'col-span-2 row-span-2'}`}>
                             <MediaRenderer src={images[0]} alt="Main" className="w-full h-full object-cover transition duration-500 group-hover:scale-105" />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition"></div>
                         </div>
 
-                        {/* Sub Images/Videos */}
                         {images.slice(1, 5).map((img, idx) => (
                             <div key={idx} onClick={() => openGallery(idx + 1)} className="hidden md:block relative cursor-pointer group overflow-hidden">
                                 <MediaRenderer src={img} alt={`Sub ${idx}`} className="w-full h-full object-cover transition duration-500 group-hover:scale-105" />
@@ -448,7 +478,8 @@ const PropertyDetailsPage = () => {
                         ) : (
                             isActive ? (
                                 <div className="space-y-3">
-                                    <button onClick={() => setShowPhone(!showPhone)} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-200">
+                                    {/* --- PHASE 6: TRACKED PHONE BUTTON --- */}
+                                    <button onClick={handleShowPhone} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-200">
                                         <Phone className="w-5 h-5" /> {showPhone ? property.ownerPhone : "Show Phone Number"}
                                     </button>
 

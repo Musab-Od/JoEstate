@@ -130,4 +130,16 @@ public class PropertyController {
 
         return ResponseEntity.ok("Status Updated to " + newStatus);
     }
+
+    @PostMapping("/{propertyId}/track-view")
+    public ResponseEntity<Void> trackView(@PathVariable Long propertyId, @RequestParam String viewerId) {
+        propertyService.trackView(propertyId, viewerId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{propertyId}/track-phone")
+    public ResponseEntity<Void> trackPhoneClick(@PathVariable Long propertyId, @RequestParam String viewerId) {
+        propertyService.trackPhoneClick(propertyId, viewerId);
+        return ResponseEntity.ok().build();
+    }
 }

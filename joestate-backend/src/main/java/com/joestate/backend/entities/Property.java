@@ -3,6 +3,7 @@ package com.joestate.backend.entities;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.List;
+import java.util.Set;
 import java.time.LocalDateTime;
 
 @Entity
@@ -25,6 +26,17 @@ public class Property {
     private String location;
     private Integer roomCount;
     private Integer bathCount;
+
+    // --- PHASE 6: UNIQUE ANALYTICS TRACKING ---
+    @ElementCollection
+    @CollectionTable(name = "property_viewers", joinColumns = @JoinColumn(name = "property_id"))
+    @Column(name = "viewer_id")
+    private Set<String> uniqueViewers = new java.util.HashSet<>();
+
+    @ElementCollection
+    @CollectionTable(name = "property_phone_clicks", joinColumns = @JoinColumn(name = "property_id"))
+    @Column(name = "viewer_id")
+    private Set<String> uniquePhoneClicks = new java.util.HashSet<>();
 
     @Enumerated(EnumType.STRING)
     private PropertyType type;

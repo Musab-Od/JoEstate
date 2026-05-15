@@ -23,29 +23,24 @@ const MessagesPage = () => {
 
     const chatContainerRef = useRef(null);
 
-    // 1. Fetch User Email and Inbox on Mount
     useEffect(() => {
         const token = localStorage.getItem("token");
         if (!token) { navigate("/login"); return; }
 
         const fetchData = async () => {
             try {
-                // Get my info
                 const userRes = await axios.get("/users/me", { headers: { Authorization: `Bearer ${token}` } });
                 setMyEmail(userRes.data.email);
                 setCurrentUser(userRes.data);
 
-                // Get my inbox
                 const inboxRes = await axios.get("/chat/inbox", { headers: { Authorization: `Bearer ${token}` } });
                 const allThreads = inboxRes.data;
 
-                // If URL has a thread ID, open it!
                 if (urlThreadId) {
                     const threadToOpen = allThreads.find(t => t.threadId.toString() === urlThreadId);
                     if (threadToOpen) setActiveThread(threadToOpen);
                 }
 
-                // GP2 FIX: Hide empty threads from the sidebar (unless it's the one I just opened to type in!)
                 const visibleInbox = allThreads.filter(thread =>
                     thread.lastMessage !== "No messages yet" || thread.threadId.toString() === urlThreadId
                 );
@@ -59,7 +54,6 @@ const MessagesPage = () => {
         fetchData();
     }, [navigate, urlThreadId]);
 
-    // 2. Fetch Chat History when a Thread is selected
     useEffect(() => {
         const token = localStorage.getItem("token");
         if (activeThread && token) {
@@ -69,15 +63,12 @@ const MessagesPage = () => {
         }
     }, [activeThread]);
 
-    // 3. Connect the WebSocket Engine!
     useEffect(() => {
         if (!activeThread) return;
 
-// Clear the unread count in the UI the moment we open this chat
         setInbox(prevInbox => {
             const currentThread = prevInbox.find(t => t.threadId === activeThread.threadId);
             if (currentThread && currentThread.unreadCount > 0) {
-                // Decrement the global red bubble in the Header!
                 setUnreadMessages(prev => Math.max(0, prev - 1));
             }
             return prevInbox.map(thread =>
@@ -93,10 +84,8 @@ const MessagesPage = () => {
                 client.subscribe(`/topic/thread/${activeThread.threadId}`, (message) => {
                     const receivedMessage = JSON.parse(message.body);
 
-                    // Add message to the chat window
                     setMessages((prev) => [...prev, receivedMessage]);
 
-                    // Sync the Left Panel (Inbox) instantly!
                     setInbox((prevInbox) => {
                         const updatedInbox = prevInbox.map(thread => {
                             if (thread.threadId === activeThread.threadId) {
@@ -104,7 +93,6 @@ const MessagesPage = () => {
                             }
                             return thread;
                         });
-                        // Sort so the newest message jumps to the top!
                         return updatedInbox.sort((a, b) => new Date(b.lastUpdatedAt) - new Date(a.lastUpdatedAt));
                     });
                 });
@@ -117,14 +105,12 @@ const MessagesPage = () => {
         return () => client.deactivate();
     }, [activeThread]);
 
-    // 4. Safely Scroll to bottom (No jumping to footer!)
     useEffect(() => {
         if (chatContainerRef.current) {
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
         }
     }, [messages]);
 
-    // 5. Send Message Function
     const handleSendMessage = (e) => {
         e.preventDefault();
         if (!newMessage.trim() || !stompClient || !stompClient.connected) return;
@@ -135,19 +121,22 @@ const MessagesPage = () => {
             content: newMessage.trim()
         };
 
-        // Fire the message through the WebSocket tunnel
         stompClient.publish({
             destination: `/app/chat/${activeThread.threadId}/send`,
             body: JSON.stringify(messagePayload)
         });
 
-        setNewMessage(""); // Clear input
+        setNewMessage("");
     };
+
+    // --- SMART THUMBNAIL LOGIC FOR CHAT HEADER ---
+    const isVideoThumbnail = activeThread?.propertyImageUrl &&
+        (activeThread.propertyImageUrl.endsWith('.mp4') || activeThread.propertyImageUrl.endsWith('.webm'));
 
     return (
         <div className="bg-gray-50 flex h-[calc(100vh-80px)] border-t border-gray-200">
 
-            {/* LEFT PANEL: Inbox (Hidden on mobile if chat is active) */}
+            {/* LEFT PANEL: Inbox */}
             <div className={`w-full md:w-1/3 bg-white border-r border-gray-200 flex flex-col ${activeThread ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-4 border-b border-gray-100 bg-gray-50/50">
                     <h2 className="text-xl font-extrabold text-gray-800">Messages</h2>
@@ -201,9 +190,29 @@ const MessagesPage = () => {
                         <div className="bg-white p-4 border-b border-gray-200 flex items-center justify-between shadow-sm z-10">
                             <div className="flex items-center gap-4">
                                 <button onClick={() => setActiveThread(null)} className="md:hidden text-gray-500 hover:text-blue-600 font-bold">← Back</button>
-                                <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-100">
-                                    {activeThread.propertyImageUrl ? <img src={`http://localhost:8080/uploads/${activeThread.propertyImageUrl}`} className="w-full h-full object-cover" /> : <ImageIcon className="w-6 h-6 m-4 text-gray-300" />}
+
+                                <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-100 relative">
+                                    {/* --- SMART THUMBNAIL RENDERER --- */}
+                                    {activeThread.propertyImageUrl ? (
+                                        isVideoThumbnail ? (
+                                            <video
+                                                src={`http://localhost:8080/uploads/${activeThread.propertyImageUrl}#t=0.1`}
+                                                className="w-full h-full object-cover"
+                                                muted
+                                                playsInline
+                                                preload="metadata"
+                                            />
+                                        ) : (
+                                            <img
+                                                src={`http://localhost:8080/uploads/${activeThread.propertyImageUrl}`}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        )
+                                    ) : (
+                                        <ImageIcon className="w-6 h-6 m-4 text-gray-300" />
+                                    )}
                                 </div>
+
                                 <div>
                                     <h2 className="font-bold text-gray-900 text-lg leading-tight">{activeThread.propertyTitle}</h2>
                                     <p className="text-blue-600 font-bold text-sm">{new Intl.NumberFormat('en-JO').format(activeThread.propertyPrice)} JOD</p>
@@ -222,7 +231,6 @@ const MessagesPage = () => {
                                 return (
                                     <div key={index} className={`flex ${isSentByMe ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`max-w-[75%] px-5 py-3 rounded-2xl shadow-sm ${isSentByMe ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm'}`}>
-                                            {/* Added break-words and break-all to fix the long text bug */}
                                             <p className="text-sm whitespace-pre-wrap break-words break-all">{msg.content}</p>
                                             <p className={`text-[10px] mt-1 text-right ${isSentByMe ? 'text-blue-200' : 'text-gray-400'}`}>
                                                 {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -233,7 +241,7 @@ const MessagesPage = () => {
                             })}
                         </div>
 
-                        {/* Chat Footer: Input Field (With Multi-Tier Logic) */}
+                        {/* Chat Footer: Input Field */}
                         <div className="bg-white p-4 border-t border-gray-200">
                             {currentUser && (currentUser.banStatus === 'MUTE_MESSAGES' || currentUser.banStatus === 'BANNED' || currentUser.banStatus === 'MUTE_BOTH') ? (
                                 <div className="bg-red-50 text-red-600 p-3 rounded-xl text-center font-bold text-sm border border-red-200 flex flex-col items-center justify-center">

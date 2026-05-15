@@ -60,9 +60,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
 
                         // 3. Property endpoints
-                        // Everyone can SEARCH/VIEW (GET)
+                        // Everyone can SEARCH/VIEW (GET) / Everyone can track views and phone clicks (POST)
                         .requestMatchers(HttpMethod.GET, "/api/properties/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/users/{id}").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/properties/*/track-view", "/api/properties/*/track-phone").permitAll()
                         // Only Logged-in users can CREATE/EDIT (POST, PUT, DELETE)
                         .requestMatchers(HttpMethod.POST, "/api/properties/**").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/properties/**").authenticated()

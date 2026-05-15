@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import axios from "../api/axios";
-import { User, Save, Camera, Mail, Lock, Building2, Heart, Settings, Plus, ShieldCheck, Clock, CheckCircle, XCircle, Upload, FileText } from "lucide-react";
+import { User, Save, Camera, Mail, Lock, Building2, Heart, Settings, Plus, ShieldCheck, Clock, CheckCircle, XCircle, Upload, FileText, BarChart3, Eye, PhoneCall, Activity, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SearchResultCard from "../components/SearchResultCard";
+import AnalyticsModal from "../components/AnalyticsModal";
 
 const ProfilePage = () => {
     const navigate = useNavigate();
@@ -13,12 +14,16 @@ const ProfilePage = () => {
     const [myProperties, setMyProperties] = useState([]);
     const [myFavorites, setMyFavorites] = useState([]);
 
-    // --- NEW: VERIFICATION TICKET STATES ---
+    // --- VERIFICATION TICKET STATES ---
     const [verificationTicket, setVerificationTicket] = useState(null);
     const [ticketMessage, setTicketMessage] = useState("");
     const [ticketFile, setTicketFile] = useState(null);
     const [submittingTicket, setSubmittingTicket] = useState(false);
     const [enterpriseName, setEnterpriseName] = useState("");
+
+    // --- PHASE 6: ANALYTICS STATE ---
+    const [selectedAnalytics, setSelectedAnalytics] = useState(null);
+    const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -29,8 +34,6 @@ const ProfilePage = () => {
                 const token = localStorage.getItem("token");
                 const headers = { Authorization: `Bearer ${token}` };
 
-                // Added the verification endpoint to the Promise.all!
-                // We use .catch so if it fails (or user has no ticket), it doesn't break the dashboard
                 const [userRes, propsRes, favsRes, ticketRes] = await Promise.all([
                     axios.get("/users/me", { headers }),
                     axios.get("/users/me/properties", { headers }),
@@ -116,7 +119,6 @@ const ProfilePage = () => {
         }
     };
 
-    // --- NEW: SUBMIT TICKET HANDLER ---
     const handleTicketSubmit = async (e) => {
         e.preventDefault();
         if (!ticketFile || !ticketMessage.trim()) {
@@ -138,7 +140,6 @@ const ProfilePage = () => {
                 headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" }
             });
 
-            // Refresh ticket data instantly
             const res = await axios.get("/users/me/verification", {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -178,7 +179,6 @@ const ProfilePage = () => {
                     <div className="text-center md:text-left text-white flex-grow">
                         <div className="flex items-center justify-center md:justify-start gap-3">
                             <h1 className="text-3xl font-bold">{displayName}</h1>
-                            {/* Blue checkmark in header if verified! */}
                             {user.isVerified && <ShieldCheck className="w-6 h-6 text-blue-400" />}
                         </div>
                         <p className="text-blue-200 flex items-center justify-center md:justify-start gap-2 mt-1">
@@ -200,7 +200,6 @@ const ProfilePage = () => {
                     <button onClick={() => setActiveTab("favorites")} className={`flex-1 min-w-[150px] py-4 font-bold text-sm flex items-center justify-center gap-2 transition ${activeTab === "favorites" ? "text-blue-600 bg-blue-50 border-b-2 border-blue-600" : "text-gray-500 hover:bg-gray-50"}`}>
                         <Heart className="w-4 h-4" /> Favorites ({myFavorites.length})
                     </button>
-                    {/* NEW TAB */}
                     <button onClick={() => setActiveTab("verification")} className={`flex-1 min-w-[150px] py-4 font-bold text-sm flex items-center justify-center gap-2 transition ${activeTab === "verification" ? "text-blue-600 bg-blue-50 border-b-2 border-blue-600" : "text-gray-500 hover:bg-gray-50"}`}>
                         <ShieldCheck className="w-4 h-4" /> Verification
                     </button>
@@ -235,7 +234,7 @@ const ProfilePage = () => {
                         </form>
                     )}
 
-                    {/* --- TAB 2: LISTINGS --- */}
+                    {/* --- TAB 2: LISTINGS (UPDATED WITH ANALYTICS BUTTON) --- */}
                     {activeTab === "listings" && (
                         <div>
                             <div className="flex justify-between items-center mb-6">
@@ -250,9 +249,27 @@ const ProfilePage = () => {
                                     <p className="text-gray-500 font-medium">You haven't listed any properties yet.</p>
                                 </div>
                             ) : (
-                                <div className="space-y-4">
+                                <div className="space-y-6">
                                     {myProperties.map(prop => (
-                                        <SearchResultCard key={prop.propertyId} property={prop} onFavoriteToggle={handleFavoriteChange} />
+                                        <div key={prop.propertyId} className="relative">
+                                            {/* The Standard Property Card */}
+                                            <SearchResultCard property={prop} onFavoriteToggle={handleFavoriteChange} />
+
+                                            {/* PHASE 6: STRICT PREMIUM CHECK FOR ANALYTICS BUTTON */}
+                                            {user.isPremium && (
+                                                <div className="flex justify-end mt-2 px-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedAnalytics(prop);
+                                                            setIsAnalyticsModalOpen(true);
+                                                        }}
+                                                        className="px-5 py-2 bg-gradient-to-r from-indigo-50 to-blue-50 text-indigo-700 hover:from-indigo-100 hover:to-blue-100 font-black rounded-xl text-sm transition-all flex items-center gap-2 border border-indigo-200 shadow-sm hover:shadow-md"
+                                                    >
+                                                        <BarChart3 className="w-4 h-4" /> View Analytics
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     ))}
                                 </div>
                             )}
@@ -290,7 +307,6 @@ const ProfilePage = () => {
                             </p>
 
                             {!user.isPremium ? (
-                                /* SCENARIO A: Free User (Upsell) */
                                 <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200 rounded-3xl p-8 text-center shadow-sm">
                                     <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                         <Lock className="w-8 h-8 text-yellow-600" />
@@ -299,13 +315,11 @@ const ProfilePage = () => {
                                     <p className="text-yellow-800 text-sm mb-6 max-w-sm mx-auto font-medium">
                                         You must have an active Premium Subscription to apply for Enterprise Verification and receive the Blue Checkmark.
                                     </p>
-                                    {/* Link this to wherever your checkout modal is later */}
                                     <button className="bg-yellow-500 hover:bg-yellow-600 text-white font-black py-3 px-8 rounded-xl transition shadow-lg shadow-yellow-200">
                                         Upgrade to Premium
                                     </button>
                                 </div>
                             ) : verificationTicket ? (
-                                /* SCENARIO B: User Has Submitted a Ticket */
                                 <div className="space-y-6">
                                     {verificationTicket.status === 'PENDING' && (
                                         <div className="bg-blue-50 border border-blue-200 p-6 rounded-2xl flex items-start gap-4">
@@ -346,7 +360,6 @@ const ProfilePage = () => {
                                         </div>
                                     )}
 
-                                    {/* Admin Reply Box (If Admin left a note) */}
                                     {verificationTicket.adminReply && (
                                         <div className="bg-gray-50 border border-gray-200 p-5 rounded-2xl">
                                             <p className="text-xs font-bold text-gray-500 uppercase mb-2">Message from Trust & Safety Team:</p>
@@ -359,7 +372,6 @@ const ProfilePage = () => {
                                     </div>
                                 </div>
                             ) : (
-                                /* SCENARIO C: Premium User Applying */
                                 <form onSubmit={handleTicketSubmit} className="space-y-6">
                                     <div className="bg-blue-50 border border-blue-100 p-5 rounded-2xl mb-6">
                                         <h4 className="font-bold text-blue-900 mb-1">Application Requirements</h4>
@@ -419,9 +431,15 @@ const ProfilePage = () => {
                             )}
                         </div>
                     )}
-
                 </div>
             </div>
+
+            {isAnalyticsModalOpen && selectedAnalytics && (
+                <AnalyticsModal
+                    property={selectedAnalytics}
+                    onClose={() => setIsAnalyticsModalOpen(false)}
+                />
+            )}
         </div>
     );
 };
