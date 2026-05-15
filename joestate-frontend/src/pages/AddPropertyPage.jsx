@@ -15,13 +15,11 @@ const AddPropertyPage = () => {
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
     const [formData, setFormData] = useState({
-        title: "", description: "", price: "", area: "", location: "",
+        title: "", description: "", price: "", area: "", location: "", mapLink: "", // <-- ADDED mapLink
         roomCount: "", bathCount: "", type: "APARTMENT", purpose: "RENT", rentFrequency: "MONTHLY",
     });
 
     const [images, setImages] = useState([]);
-
-    // PREVIEWS will now hold objects: { url: string, type: string }
     const [previews, setPreviews] = useState([]);
 
     useEffect(() => {
@@ -32,13 +30,12 @@ const AddPropertyPage = () => {
                     const data = res.data;
                     setFormData({
                         title: data.title, description: data.description, price: data.price.toString(),
-                        area: data.area.toString(), location: data.location, roomCount: data.roomCount.toString(),
-                        bathCount: data.bathCount.toString(), type: data.type, purpose: data.purpose,
+                        area: data.area.toString(), location: data.location, mapLink: data.mapLink || "", // <-- ADDED mapLink
+                        roomCount: data.roomCount.toString(), bathCount: data.bathCount.toString(), type: data.type, purpose: data.purpose,
                         rentFrequency: data.rentFrequency || "NONE",
                     });
 
                     if (data.imageUrls) {
-                        // FIXED: Mark old files as video or image based on extension
                         setPreviews(data.imageUrls.map(url => ({
                             url: `http://localhost:8080/uploads/${url}`,
                             type: url.endsWith('.mp4') || url.endsWith('.webm') ? 'video/mp4' : 'image/jpeg'
@@ -107,7 +104,6 @@ const AddPropertyPage = () => {
 
         setImages((prev) => [...prev, ...files]);
 
-        // FIXED: Save the URL AND the actual file type so the browser knows it's a video!
         const newPreviews = files.map((file) => ({
             url: URL.createObjectURL(file),
             type: file.type
@@ -133,6 +129,13 @@ const AddPropertyPage = () => {
         setIsLoading(true);
         setError("");
 
+        // --- NEW: GOOGLE MAPS VALIDATION ---
+        if (formData.mapLink && !/^(https?\:\/\/)?(www\.)?(google\.[a-z]+\/maps|maps\.app\.goo\.gl)\/.+/.test(formData.mapLink)) {
+            alert("Please enter a valid Google Maps link (e.g., https://maps.app.goo.gl/...)");
+            setIsLoading(false);
+            return;
+        }
+
         if (previews.length === 0) {
             alert("Please include at least one photo of the property.");
             setIsLoading(false);
@@ -156,6 +159,11 @@ const AddPropertyPage = () => {
             data.append("type", formData.type);
             data.append("purpose", formData.purpose);
 
+            // --- NEW: APPEND MAP LINK ---
+            if (formData.mapLink) {
+                data.append("mapLink", formData.mapLink);
+            }
+
             if (!isLand) {
                 data.append("roomCount", formData.roomCount || "0");
                 data.append("bathCount", formData.bathCount || "0");
@@ -166,7 +174,6 @@ const AddPropertyPage = () => {
 
             if (formData.purpose === "RENT") data.append("rentFrequency", formData.rentFrequency);
 
-            // FIXED: Extract URL from the object safely
             const keptImages = previews
                 .filter(p => p.url.startsWith("http://localhost:8080/uploads/"))
                 .map(p => p.url.replace("http://localhost:8080/uploads/", ""));
@@ -233,6 +240,22 @@ const AddPropertyPage = () => {
                                         <input type="text" name="location" placeholder="e.g. Amman, 7th Circle" value={formData.location} onChange={handleChange} className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none" required />
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* --- NEW: GOOGLE MAPS LINK INPUT --- */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Google Maps Link <span className="text-gray-400 font-normal">(Optional)</span></label>
+                                <input
+                                    type="url"
+                                    name="mapLink"
+                                    placeholder="e.g. https://maps.app.goo.gl/..."
+                                    value={formData.mapLink}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                                />
+                                {formData.mapLink && !/^(https?\:\/\/)?(www\.)?(google\.[a-z]+\/maps|maps\.app\.goo\.gl)\/.+/.test(formData.mapLink) && (
+                                    <p className="text-xs text-red-500 font-bold mt-1">Please enter a valid Google Maps link.</p>
+                                )}
                             </div>
 
                             <div>
@@ -385,8 +408,6 @@ const AddPropertyPage = () => {
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
                                     {previews.map((item, index) => (
                                         <div key={index} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
-
-                                            {/* FIXED: The Smart Renderer checks the type property we created */}
                                             {item.type && item.type.startsWith("video/") ? (
                                                 <video src={item.url} autoPlay loop muted className="w-full h-full object-cover" />
                                             ) : (

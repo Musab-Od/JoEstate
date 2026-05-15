@@ -35,6 +35,7 @@ public class PropertyDTO {
     private String location;
     private Integer roomCount;
     private Integer bathCount;
+    private String mapLink;
     private Boolean isFavorite;
 
     private PropertyType type;

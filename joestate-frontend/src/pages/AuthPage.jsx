@@ -7,6 +7,16 @@ const AuthPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
+    // --- ADD THIS BLOCK ---
+    // If the user is already logged in, kick them out to the Home page instantly.
+    // { replace: true } deletes this page from their browser history so the back button works!
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (token) {
+            navigate("/", { replace: true });
+        }
+    }, [navigate]);
+
     // State to toggle between Login (true) and Register (false)
     const [isLoginMode, setIsLoginMode] = useState(true);
 

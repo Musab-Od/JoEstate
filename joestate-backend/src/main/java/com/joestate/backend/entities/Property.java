@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.util.List;
 import java.util.Set;
+import java.util.HashSet;
 import java.time.LocalDateTime;
 
 @Entity
@@ -15,7 +16,7 @@ public class Property {
     private Long propertyId;
 
     @ManyToOne
-    @JoinColumn(name = "owner_id") // Links to users table
+    @JoinColumn(name = "owner_id")
     private User owner;
 
     private String title;
@@ -24,19 +25,24 @@ public class Property {
     private Double price;
     private Double area;
     private String location;
+
+    // --- NEW: GOOGLE MAPS LINK ---
+    @Column(name = "map_link", length = 500)
+    private String mapLink;
+
     private Integer roomCount;
     private Integer bathCount;
 
-    // --- PHASE 6: UNIQUE ANALYTICS TRACKING ---
+    // --- PHASE 6: CLEAN HASHSET USAGE ---
     @ElementCollection
     @CollectionTable(name = "property_viewers", joinColumns = @JoinColumn(name = "property_id"))
     @Column(name = "viewer_id")
-    private Set<String> uniqueViewers = new java.util.HashSet<>();
+    private Set<String> uniqueViewers = new HashSet<>();
 
     @ElementCollection
     @CollectionTable(name = "property_phone_clicks", joinColumns = @JoinColumn(name = "property_id"))
     @Column(name = "viewer_id")
-    private Set<String> uniquePhoneClicks = new java.util.HashSet<>();
+    private Set<String> uniquePhoneClicks = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
     private PropertyType type;

@@ -389,7 +389,21 @@ const PropertyDetailsPage = () => {
                             )}
                         </div>
                         <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-2">{property.title}</h1>
-                        <div className="flex items-center text-gray-500 font-medium"><MapPin className="w-5 h-5 mr-1 text-blue-600" /> {property.location}</div>
+                        {property.mapLink ? (
+                            <a
+                                href={property.mapLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center text-gray-500 font-medium hover:text-blue-600 transition-colors group cursor-pointer"
+                            >
+                                <MapPin className="w-5 h-5 mr-1 text-blue-600 group-hover:scale-110 transition-transform" />
+                                <span className="underline decoration-transparent group-hover:decoration-blue-600 transition-colors">{property.location}</span>
+                            </a>
+                        ) : (
+                            <div className="flex items-center text-gray-500 font-medium">
+                                <MapPin className="w-5 h-5 mr-1 text-blue-600" /> {property.location}
+                            </div>
+                        )}
                     </div>
                     <div className="flex items-center justify-between bg-gray-50 p-6 rounded-2xl border border-gray-100">
                         <div className="text-center"><div className="flex items-center justify-center gap-2 text-gray-400 mb-1"><BedDouble className="w-5 h-5"/> Beds</div><span className="text-xl font-bold text-gray-900">{property.roomCount}</span></div>
