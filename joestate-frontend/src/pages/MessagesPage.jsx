@@ -5,6 +5,24 @@ import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client/dist/sockjs";
 import { Send, Image as ImageIcon, Info, User, ShieldAlert } from "lucide-react";
 import { useWebSocket } from "../context/WebSocketContext"
+import React from "react"; // <-- Make sure React is imported for fragments
+
+// --- NEW: DATE FORMATTER HELPER ---
+const formatMessageDate = (timestamp) => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) {
+        return "Today";
+    }
+    if (date.toDateString() === yesterday.toDateString()) {
+        return "Yesterday";
+    }
+    // E.g., "May 28, 2026"
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
 const MessagesPage = () => {
     const navigate = useNavigate();
@@ -129,7 +147,6 @@ const MessagesPage = () => {
         setNewMessage("");
     };
 
-    // --- SMART THUMBNAIL LOGIC FOR CHAT HEADER ---
     const isVideoThumbnail = activeThread?.propertyImageUrl &&
         (activeThread.propertyImageUrl.endsWith('.mp4') || activeThread.propertyImageUrl.endsWith('.webm'));
 
@@ -186,13 +203,12 @@ const MessagesPage = () => {
                     </div>
                 ) : (
                     <>
-                        {/* Chat Header: Property Info */}
+                        {/* Chat Header */}
                         <div className="bg-white p-4 border-b border-gray-200 flex items-center justify-between shadow-sm z-10">
                             <div className="flex items-center gap-4">
                                 <button onClick={() => setActiveThread(null)} className="md:hidden text-gray-500 hover:text-blue-600 font-bold">← Back</button>
 
                                 <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-gray-100 relative">
-                                    {/* --- SMART THUMBNAIL RENDERER --- */}
                                     {activeThread.propertyImageUrl ? (
                                         isVideoThumbnail ? (
                                             <video
@@ -223,25 +239,42 @@ const MessagesPage = () => {
                             </button>
                         </div>
 
-                        {/* Chat Body: Messages */}
+                        {/* Chat Body: Messages (UPDATED WITH DATE SEPARATORS) */}
                         <div ref={chatContainerRef} className="flex-grow p-4 overflow-y-auto space-y-4">
                             {messages.map((msg, index) => {
                                 const isSentByMe = msg.senderName !== activeThread.otherUserName;
 
+                                // --- SMART DATE CHECKER ---
+                                const msgDate = new Date(msg.timestamp).toDateString();
+                                const prevMsgDate = index > 0 ? new Date(messages[index - 1].timestamp).toDateString() : null;
+                                const showDateDivider = msgDate !== prevMsgDate;
+
                                 return (
-                                    <div key={index} className={`flex ${isSentByMe ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[75%] px-5 py-3 rounded-2xl shadow-sm ${isSentByMe ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm'}`}>
-                                            <p className="text-sm whitespace-pre-wrap break-words break-all">{msg.content}</p>
-                                            <p className={`text-[10px] mt-1 text-right ${isSentByMe ? 'text-blue-200' : 'text-gray-400'}`}>
-                                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </p>
+                                    <React.Fragment key={index}>
+                                        {/* Render the Date Pill if it's a new day */}
+                                        {showDateDivider && (
+                                            <div className="flex justify-center my-4">
+                                                <span className="bg-gray-200/60 text-gray-500 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                                                    {formatMessageDate(msg.timestamp)}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Render the Message Bubble */}
+                                        <div className={`flex ${isSentByMe ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-[75%] px-5 py-3 rounded-2xl shadow-sm ${isSentByMe ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm'}`}>
+                                                <p className="text-sm whitespace-pre-wrap break-words break-all">{msg.content}</p>
+                                                <p className={`text-[10px] mt-1 text-right ${isSentByMe ? 'text-blue-200' : 'text-gray-400'}`}>
+                                                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </p>
+                                            </div>
                                         </div>
-                                    </div>
+                                    </React.Fragment>
                                 )
                             })}
                         </div>
 
-                        {/* Chat Footer: Input Field */}
+                        {/* Chat Footer */}
                         <div className="bg-white p-4 border-t border-gray-200">
                             {currentUser && (currentUser.banStatus === 'MUTE_MESSAGES' || currentUser.banStatus === 'BANNED' || currentUser.banStatus === 'MUTE_BOTH') ? (
                                 <div className="bg-red-50 text-red-600 p-3 rounded-xl text-center font-bold text-sm border border-red-200 flex flex-col items-center justify-center">

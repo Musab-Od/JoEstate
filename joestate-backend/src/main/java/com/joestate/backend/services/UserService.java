@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -29,6 +30,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final VerificationRequestRepository verificationRequestRepository;
+    private final PasswordEncoder passwordEncoder;
 
     // Directory where uploads are stored
     private final String UPLOAD_DIR = "uploads/";
@@ -63,6 +65,24 @@ public class UserService {
         user.setLastName(dto.getLastName());
         user.setPhoneNumber(dto.getPhoneNumber());
         user.setBio(dto.getBio());
+
+        // 2. PASSWORD UPDATE LOGIC
+        // Only trigger this if the user actually typed a new password in the frontend
+        if (dto.getNewPassword() != null && !dto.getNewPassword().trim().isEmpty()) {
+
+            // Safety Check 1: Did they provide their current password?
+            if (dto.getOldPassword() == null || dto.getOldPassword().trim().isEmpty()) {
+                throw new RuntimeException("You must enter your current password to change it.");
+            }
+
+            // Safety Check 2: Does the old password match what's in the database?
+            if (!passwordEncoder.matches(dto.getOldPassword(), user.getPasswordHash())) {
+                throw new RuntimeException("Your current password is incorrect.");
+            }
+
+            // If it matches, hash the new password and save it!
+            user.setPasswordHash(passwordEncoder.encode(dto.getNewPassword()));
+        }
 
         return mapToDTO(user);
     }
@@ -210,6 +230,7 @@ public class UserService {
                 .isVerified(user.isVerified())
                 .isPremium(user.isPremium())
                 .enterpriseName(user.getEnterpriseName())
+                .banStatus(user.getBanStatus() != null ? user.getBanStatus().name() : "NONE")
                 .createdAt(user.getCreatedAt())
                 .build();
     }

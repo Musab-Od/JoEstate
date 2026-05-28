@@ -76,7 +76,7 @@ const Hero = ({onSearch}) => {
         };
 
         if (propertyType !== 'Any') {
-            filters.propertyType = propertyType.toUpperCase();
+            filters.type = propertyType.toUpperCase();
         }
 
         // 2. Handle Rent Frequency (Only if Renting & Not "Any")
